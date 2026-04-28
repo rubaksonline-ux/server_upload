@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Video Uploader</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <style>
+    body { background: #f8f9fa; padding: 2rem; }
+    .upload-card { max-width: 650px; margin: 0 auto; }
+    #preview { max-width: 100%; margin-top: 1rem; border-radius: 8px; }
+    .progress { height: 28px; transition: opacity 0.4s ease; }
+    
+    /* Анимация появления полей */
+    .file-info { 
+      opacity: 0; 
+      max-height: 0; 
+      overflow: hidden; 
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .file-info.show { 
+      opacity: 1; 
+      max-height: 140px; 
+      margin-top: 1rem;
+    }
+    .field-group { margin-bottom: 0.75rem; }
+    .field-group label { font-size: 0.85rem; font-weight: 600; color: #6c757d; margin-bottom: 0.25rem; display: block; }
+    .field-group input { font-family: 'Courier New', monospace; background: #fff; font-size: 0.9rem; }
+    
+    @keyframes fadeInUp { 
+      from { opacity: 0; transform: translateY(10px); } 
+      to { opacity: 1; transform: translateY(0); } 
+    }
+    .fade-in-up { animation: fadeInUp 0.4s ease forwards; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card upload-card shadow">
+      <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">📤 Video Uploader</h4>
+      </div>
+      <div class="card-body">
+        <form id="uploadForm">
+          <div class="mb-3">
+            <label class="form-label">Выберите файл:</label>
+            <input type="file" class="form-control" id="fileInput" accept="video/*,.png,.jpg,.jpeg"/>
+          </div>
+
+          <!-- Поля с именами (появляются с эффектом) -->
+          <div id="fileInfo" class="file-info">
+            <div class="field-group">
+              <label>📄 Оригинальное имя:</label>
+              <input type="text" class="form-control" id="originalName" readonly />
+            </div>
+            <div class="field-group">
+              <label>✨ Дружелюбное имя (для сервера):</label>
+              <input type="text" class="form-control" id="friendlyName" readonly />
+            </div>
+			<div class="field-group">
+				<label>🏷️ Тип файла:</label>
+				<input type="text" class="form-control" id="fileType" readonly />
+			</div>
+			
+          </div>
+
+          <button type="submit" class="btn btn-success w-100" id="uploadBtn" disabled>
+            🚀 Начать загрузку
+          </button>
+        </form>
+
+        <div id="progressContainer" class="mt-4 d-none">
+          <div class="d-flex justify-content-between mb-1">
+            <small>Прогресс:</small>
+            <small id="percentText">0%</small>
+          </div>
+          <div class="progress">
+            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                 role="progressbar" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <div id="result" class="mt-4 d-none text-center fade-in-up">
+          <h6 class="text-success fw-bold">✅ Загрузка завершена!</h6>
+          <img id="preview" src="" alt="Preview" class="img-thumbnail shadow-sm"/>
+        </div>
+
+        <div id="status" class="mt-3 small text-muted text-center"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- jQuery & FriendURL Plugin (как в вашем файле) -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="jquery.friendurl.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+  <script>
+    const socket = io();
+    const fileInput = document.getElementById('fileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const percentText = document.getElementById('percentText');
+    const result = document.getElementById('result');
+    const preview = document.getElementById('preview');
+    const status = document.getElementById('status');
+    const fileInfo = document.getElementById('fileInfo');
+    const originalNameInput = document.getElementById('originalName');
+    const friendlyNameInput = document.getElementById('friendlyName');
+
+    let file = null;
+    let friendlyFileName = '';
+    const CHUNK_SIZE = 524288; // 512KB
+
+    // --- Обработка выбора файла ---
+    fileInput.addEventListener('change', (e) => {
+      file = e.target.files[0];
+      if (!file) return;
+
+      originalNameInput.value = file.name;
+      
+      // Генерация дружелюбного имени через логику jquery.friendurl.js
+      friendlyFileName = transliterateToFriendly(file.name);
+      friendlyNameInput.value = friendlyFileName;
+	  
+	  
+// После генерации friendlyFileName добавьте:
+	  const fileType = detectFileType(file.name);
+	  document.getElementById('fileType').value = fileType.toUpperCase();
+	  
+	  
+
+      // Эффект появления полей
+      fileInfo.classList.add('show');
+      uploadBtn.disabled = false;
+      status.textContent = `Готов к загрузке: ${friendlyFileName}`;
+    });
+
+
+
+
+
+// Функция определения типа (дублирует серверную логику для мгновенного фидбека)
+function detectFileType(filename) {
+  const ext = filename.split('.').pop().toLowerCase();
+  const types = {
+    video: ['mp4','webm','mkv','avi','mov'],
+    image: ['jpg','jpeg','png','gif','webp'],
+    audio: ['mp3','wav','ogg','flac'],
+    document: ['pdf','doc','docx','xls','xlsx','txt'],
+    archive: ['zip','rar','7z','tar'],
+    program: ['exe','msi','app','dmg']
+  };
+  for (const [type, exts] of Object.entries(types)) {
+    if (exts.includes(ext)) return type;
+  }
+  return 'other';
+}
+
+
+function transliterateToFriendly(filename) {
+  const lastDot = filename.lastIndexOf('.');
+  const ext = lastDot !== -1 ? filename.slice(lastDot) : '';
+  const baseName = lastDot !== -1 ? filename.slice(0, lastDot) : filename;
+
+  // Таблицы транслитерации (как в jquery.friendurl.js)
+  const cyrillic = ["а","б","в","г","д","е","ж","з","и","й","к","л","м","н","о","п","р","с","т","у","ф","х","ц","ч","ш","щ","ъ","ь","ю","я","А","Б","В","Г","Д","Е","Ж","З","И","Й","К","Л","М","Н","О","П","Р","С","Т","У","Ф","Х","Ц","Ч","Ш","Щ","Ъ","Ь","Ю","Я","Ї","ї","Є","є","Ы","ы","Ё","ё","ı","İ","ğ","Ğ","ü","Ü","ş","Ş","ö","Ö","ç","Ç","Á","á","Â","â","Ã","ã","À","à","Ç","ç","É","é","Ê","ê","Í","í","Ó","ó","Ô","ô","Õ","õ","Ú","ú","Ñ","ñ","È","è"];
+  const latin = ["a","b","v","g","d","e","zh","z","i","y","k","l","m","n","o","p","r","s","t","u","f","h","ts","ch","sh","sht","a","y","yu","ya","A","B","B","G","D","E","Zh","Z","I","Y","K","L","M","N","O","P","R","S","T","U","F","H","Ts","Ch","Sh","Sht","A","Y","Yu","Ya","I","i","Ye","ye","I","i","Yo","yo","i","I","g","G","u","U","s","S","o","O","c","C","A","a","A","a","A","a","A","a","C","c","E","e","E","e","I","i","O","o","O","o","O","o","U","u","N","n","E","e"];
+
+  let result = baseName;
+  for (let i = 0; i < cyrillic.length; i++) {
+    result = result.split(cyrillic[i]).join(latin[i]);
+  }
+
+  result = result
+    .toLowerCase()
+    .replace(/^\s+|\s+$/g, "")
+    .replace(/[_|\s]+/g, "-")
+    .replace(/[^a-z0-9-]+/g, "") // точка удалится здесь, но мы её уже сохранили
+    .replace(/[-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return result + ext; // ✅ Возвращаем дружелюбное имя С расширением
+}
+    // --- Отправка формы ---
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!file) return;
+      startUpload(file, friendlyFileName);
+    });
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function log(msg) {
+      status.textContent = msg;
+    }
+
+    async function startUpload(file, friendlyName) {
+      // Сброс состояния
+      result.classList.add('d-none');
+      progressContainer.classList.remove('d-none');
+      progressBar.style.width = '0%';
+      percentText.textContent = '0%';
+      progressBar.classList.remove('bg-danger', 'bg-success');
+      progressBar.style.opacity = '1';
+      progressBar.classList.add('progress-bar-animated');
+      uploadBtn.disabled = true;
+
+      log(`📤 Отправка: ${friendlyName}`);
+
+      socket.emit('Start', {
+        Name: friendlyName, // 🟢 На сервер уходит только дружелюбное имя
+        Size: file.size
+      });
+    }
+
+socket.on('MoreData', async ({ Place, Percent }) => {
+  if (!file) return;
+
+  const start = Place * CHUNK_SIZE;
+  if (start >= file.size) return;
+
+  const end = Math.min(start + CHUNK_SIZE, file.size);
+  const chunk = file.slice(start, end);
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    // ✅ Конвертируем ArrayBuffer → Base64 (надёжно, без потерь)
+    const bytes = new Uint8Array(e.target.result);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = btoa(binary);
+
+    socket.emit('Upload', {
+      Name: friendlyFileName,
+      Data: base64,        // 🟢 Отправляем как base64
+      IsBase64: true       // 🟢 Флаг для сервера
+    });
+  };
+  reader.readAsArrayBuffer(chunk);
+
+  // Обновляем UI
+  const currentPercent = Math.min(100, Math.round((end / file.size) * 100));
+  progressBar.style.width = `${currentPercent}%`;
+  percentText.textContent = `${currentPercent}%`;
+});
+
+    socket.on('Done', ({ Image, success, warning }) => {
+      log(success ? '✅ Файл успешно загружен!' : `⚠️ ${warning || 'Загрузка завершена'}`);
+
+      // 🟢 Плавное скрытие прогресс-бара
+      progressBar.style.width = '100%';
+      progressBar.classList.remove('progress-bar-animated');
+      progressBar.classList.add('bg-success');
+      
+      setTimeout(() => {
+        progressContainer.classList.add('d-none');
+      }, 800);
+
+      if (Image) {
+        preview.src = `data:image/jpeg;base64,${Image}`;
+        result.classList.remove('d-none');
+      }
+
+      // Сброс формы
+      uploadBtn.disabled = false;
+      fileInput.value = '';
+      file = null;
+      fileInfo.classList.remove('show');
+    });
+
+    socket.on('Error', ({ message }) => {
+      log(`❌ Ошибка: ${message}`);
+      progressBar.classList.add('bg-danger');
+      progressBar.classList.remove('progress-bar-animated');
+      uploadBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>
