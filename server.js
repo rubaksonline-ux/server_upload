@@ -5,6 +5,7 @@ const { Server } = require('socket.io');
 const path = require('path');
 const { EventEmitter } = require('events');
 const cookieParser = require('cookie-parser');
+const exphbs = require('express-handlebars');
 
 // ✅ Импортируем sequelize ПЕРЕД использованием
 const sequelize = require('./config/db.config');
@@ -18,56 +19,7 @@ const { handleStart, handleUpload, handleDisconnect } = require('./handlers/uplo
 
 // Импорт моделей и middleware
 const { authMiddleware, User: UserModel } = require('./models/User.model');
-const hbs = require('hbs');
-const path = require('path');
 
-// Регистрируем helpers из файла
-const registerHelpers = () => {
-  // Helper для иконок файлов
-  hbs.registerHelper('fileIcon', (fileType) => {
-    const icons = {
-      video: '🎬',
-      image: '🖼️',
-      audio: '🎵',
-      document: '📄',
-      archive: '📦',
-      program: '⚙️',
-      other: '📋'
-    };
-    return icons[fileType] || '📄';
-  });
-  
-  // Helper для форматирования размера
-  hbs.registerHelper('formatBytes', (bytes) => {
-    if (!bytes || bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  });
-  
-  // Helper для форматирования даты
-  hbs.registerHelper('formatDate', (date) => {
-    if (!date) return '';
-    return new Date(date).toLocaleDateString('ru-RU', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  });
-  
-  // Helper для JSON
-  hbs.registerHelper('json', (context) => {
-    return JSON.stringify(context).replace(/'/g, '&apos;').replace(/"/g, '&quot;');
-  });
-  
-  // Helper для проверки на админа
-  hbs.registerHelper('isAdmin', (role) => {
-    return role === 'admin';
-  });
-};
 
 const init = async () => {
   try {
@@ -79,13 +31,53 @@ const init = async () => {
     // 2. Express app
     const app = express();
     
-    // Настройка Handlebars
+    // Настройка Handlebars с express-handlebars
+    const hbs = exphbs.create({
+      defaultLayout: 'main',
+      layoutsDir: path.join(__dirname, 'views/layouts'),
+      partialsDir: path.join(__dirname, 'views/partials'),
+      helpers: {
+        fileIcon: (fileType) => {
+          const icons = {
+            video: '🎬',
+            image: '🖼️',
+            audio: '🎵',
+            document: '📄',
+            archive: '📦',
+            program: '⚙️',
+            other: '📋'
+          };
+          return icons[fileType] || '📄';
+        },
+        formatBytes: (bytes) => {
+          if (!bytes || bytes === 0) return '0 B';
+          const k = 1024;
+          const sizes = ['B', 'KB', 'MB', 'GB'];
+          const i = Math.floor(Math.log(bytes) / Math.log(k));
+          return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        },
+        formatDate: (date) => {
+          if (!date) return '';
+          return new Date(date).toLocaleDateString('ru-RU', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+        },
+        json: (context) => {
+          return JSON.stringify(context).replace(/'/g, '&apos;').replace(/"/g, '&quot;');
+        },
+        isAdmin: (role) => {
+          return role === 'admin';
+        }
+      }
+    });
+    
+    app.engine('hbs', hbs.engine);
     app.set('view engine', 'hbs');
     app.set('views', path.join(__dirname, 'views'));
-    hbs.registerPartials(path.join(__dirname, 'views/partials'));
-    
-    // Регистрируем helpers
-    registerHelpers();
     
     // Middleware
     app.use(express.static(config.publicDir));
