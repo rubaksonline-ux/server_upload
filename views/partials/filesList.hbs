@@ -1,0 +1,72 @@
+{{!-- Partial для списка файлов --}}
+<div class="mt-4" id="recentFiles">
+  <h5>📋 Последние файлы</h5>
+  <div id="filesList" class="row g-3">
+    <!-- Список файлов загружается через JS -->
+  </div>
+</div>
+
+<script>
+// Загрузка последних файлов
+async function loadRecentFiles() {
+  try {
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    
+    const response = await fetch('/api/files', { headers });
+    
+    if (response.ok) {
+      const files = await response.json();
+      renderFilesList(files);
+    }
+  } catch (err) {
+    console.error('Ошибка загрузки списка файлов:', err);
+  }
+}
+
+// Рендеринг списка файлов
+function renderFilesList(files) {
+  const container = document.getElementById('filesList');
+  
+  if (!files || files.length === 0) {
+    container.innerHTML = '<p class="text-muted">Нет загруженных файлов</p>';
+    return;
+  }
+  
+  const icons = {
+    video: '🎬',
+    image: '🖼️',
+    audio: '🎵',
+    document: '📄',
+    archive: '📦',
+    program: '⚙️',
+    other: '📋'
+  };
+  
+  container.innerHTML = files.map(file => `
+    <div class="col-md-6 col-lg-4">
+      <div class="card h-100 shadow-sm file-card" onclick="openFilePreview(${JSON.stringify(file).replace(/"/g, '&quot;')})" style="cursor:pointer">
+        <div class="card-body text-center">
+          <div class="display-4 mb-2">${icons[file.file_type] || '📄'}</div>
+          <h6 class="card-title text-truncate">${file.original_name}</h6>
+          <small class="text-muted">${formatBytes(file.size)}</small>
+          <div class="mt-2">
+            <span class="badge bg-secondary">${file.file_type}</span>
+          </div>
+        </div>
+        <div class="card-footer bg-transparent">
+          <small class="text-muted">Загружен: ${new Date(file.uploaded_at).toLocaleDateString()}</small>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+</script>

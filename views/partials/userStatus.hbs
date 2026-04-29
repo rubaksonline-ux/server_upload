@@ -1,4 +1,4 @@
-{{!-- Главная страница загрузки --}}
+{{!-- Partial для отображения статуса пользователя --}}
 {{#if user}}
 <div class="alert alert-info">
   👋 С возвращением, <strong>{{user.username}}</strong>! 
@@ -10,9 +10,3 @@
   <a href="/login">Войдите</a> или <a href="/register">зарегистрируйтесь</a> для доступа ко всем функциям.
 </div>
 {{/if}}
-
-{{> fileUploadPartial}}
-
-{{> filesList}}
-
-{{> uploadScripts}}
