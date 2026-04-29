@@ -18,7 +18,56 @@ const { handleStart, handleUpload, handleDisconnect } = require('./handlers/uplo
 
 // Импорт моделей и middleware
 const { authMiddleware, User: UserModel } = require('./models/User.model');
-const hbs = require('./utils/handlebars-helpers');
+const hbs = require('hbs');
+const path = require('path');
+
+// Регистрируем helpers из файла
+const registerHelpers = () => {
+  // Helper для иконок файлов
+  hbs.registerHelper('fileIcon', (fileType) => {
+    const icons = {
+      video: '🎬',
+      image: '🖼️',
+      audio: '🎵',
+      document: '📄',
+      archive: '📦',
+      program: '⚙️',
+      other: '📋'
+    };
+    return icons[fileType] || '📄';
+  });
+  
+  // Helper для форматирования размера
+  hbs.registerHelper('formatBytes', (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  });
+  
+  // Helper для форматирования даты
+  hbs.registerHelper('formatDate', (date) => {
+    if (!date) return '';
+    return new Date(date).toLocaleDateString('ru-RU', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  });
+  
+  // Helper для JSON
+  hbs.registerHelper('json', (context) => {
+    return JSON.stringify(context).replace(/'/g, '&apos;').replace(/"/g, '&quot;');
+  });
+  
+  // Helper для проверки на админа
+  hbs.registerHelper('isAdmin', (role) => {
+    return role === 'admin';
+  });
+};
 
 const init = async () => {
   try {
@@ -34,6 +83,9 @@ const init = async () => {
     app.set('view engine', 'hbs');
     app.set('views', path.join(__dirname, 'views'));
     hbs.registerPartials(path.join(__dirname, 'views/partials'));
+    
+    // Регистрируем helpers
+    registerHelpers();
     
     // Middleware
     app.use(express.static(config.publicDir));
