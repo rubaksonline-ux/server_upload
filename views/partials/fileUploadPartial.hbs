@@ -1,0 +1,222 @@
+{{#if user}}
+<div class="alert alert-info">
+  👋 С возвращением, <strong>{{user.username}}</strong>! 
+  Ваш код для обмена: <code>{{user.share_code}}</code>
+</div>
+{{else}}
+<div class="alert alert-warning">
+  ℹ️ Вы работаете в режиме анонимной загрузки. 
+  <a href="/login">Войдите</a> или <a href="/register">зарегистрируйтесь</a> для доступа ко всем функциям.
+</div>
+{{/if}}
+
+<div class="card shadow-sm">
+  <div class="card-header bg-primary text-white">
+    <h5 class="mb-0">📤 Загрузить файл</h5>
+  </div>
+  <div class="card-body">
+    <!-- Partial с формой загрузки -->
+    {{> fileUploadPartial}}
+  </div>
+</div>
+
+<div class="mt-4" id="recentFiles">
+  <h5>📋 Последние файлы</h5>
+  <div id="filesList" class="row g-3">
+    <!-- Список файлов загружается через JS -->
+  </div>
+</div>
+
+<script>
+const socket = io();
+let file = null;
+let friendlyFileName = '';
+const CHUNK_SIZE = 524288; // 512KB
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', () => {
+  loadRecentFiles();
+  initUploadForm();
+});
+
+// Загрузка последних файлов
+async function loadRecentFiles() {
+  try {
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    
+    const response = await fetch('/api/files', { headers });
+    
+    if (response.ok) {
+      const files = await response.json();
+      renderFilesList(files);
+    }
+  } catch (err) {
+    console.error('Ошибка загрузки списка файлов:', err);
+  }
+}
+
+// Рендеринг списка файлов
+function renderFilesList(files) {
+  const container = document.getElementById('filesList');
+  
+  if (!files || files.length === 0) {
+    container.innerHTML = '<p class="text-muted">Нет загруженных файлов</p>';
+    return;
+  }
+  
+  const icons = {
+    video: '🎬',
+    image: '🖼️',
+    audio: '🎵',
+    document: '📄',
+    archive: '📦',
+    program: '⚙️',
+    other: '📋'
+  };
+  
+  container.innerHTML = files.map(file => `
+    <div class="col-md-6 col-lg-4">
+      <div class="card h-100 shadow-sm file-card" onclick="openFilePreview(${JSON.stringify(file).replace(/"/g, '&quot;')})" style="cursor:pointer">
+        <div class="card-body text-center">
+          <div class="display-4 mb-2">${icons[file.file_type] || '📄'}</div>
+          <h6 class="card-title text-truncate">${file.original_name}</h6>
+          <small class="text-muted">${formatBytes(file.size)}</small>
+          <div class="mt-2">
+            <span class="badge bg-secondary">${file.file_type}</span>
+          </div>
+        </div>
+        <div class="card-footer bg-transparent">
+          <small class="text-muted">Загружен: ${new Date(file.uploaded_at).toLocaleDateString()}</small>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Инициализация формы загрузки
+function initUploadForm() {
+  const fileInput = document.getElementById('fileInput');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const fileInfo = document.getElementById('fileInfo');
+  
+  fileInput?.addEventListener('change', (e) => {
+    file = e.target.files[0];
+    if (!file) return;
+    
+    document.getElementById('originalName').value = file.name;
+    friendlyFileName = generateFriendlyName(file.name);
+    document.getElementById('fileType').value = detectFileType(file.name);
+    
+    fileInfo.classList.remove('d-none');
+    uploadBtn.disabled = false;
+  });
+  
+  uploadBtn?.addEventListener('click', () => {
+    if (file) startUpload(file, friendlyFileName);
+  });
+}
+
+function generateFriendlyName(filename) {
+  const lastDot = filename.lastIndexOf('.');
+  const ext = lastDot !== -1 ? filename.slice(lastDot) : '';
+  const baseName = lastDot !== -1 ? filename.slice(0, lastDot) : filename;
+  
+  const cyrillic = ["а","б","в","г","д","е","ж","з","и","й","к","л","м","н","о","п","р","с","т","у","ф","х","ц","ч","ш","щ","ъ","ь","ю","я","А","Б","В","Г","Д","Е","Ж","З","И","Й","К","Л","М","Н","О","П","Р","С","Т","У","Ф","Х","Ц","Ч","Ш","Щ","Ъ","Ь","Ю","Я"];
+  const latin = ["a","b","v","g","d","e","zh","z","i","y","k","l","m","n","o","p","r","s","t","u","f","h","ts","ch","sh","sht","a","y","yu","ya","A","B","V","G","D","E","Zh","Z","I","Y","K","L","M","N","O","P","R","S","T","U","F","H","Ts","Ch","Sh","Sht","A","Y","Yu","Ya"];
+  
+  let result = baseName;
+  for (let i = 0; i < cyrillic.length; i++) {
+    result = result.split(cyrillic[i]).join(latin[i]);
+  }
+  
+  return result.toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '') + ext;
+}
+
+function detectFileType(filename) {
+  const ext = filename.split('.').pop().toLowerCase();
+  const types = {
+    video: ['mp4','webm','mkv','avi','mov'],
+    image: ['jpg','jpeg','png','gif','webp'],
+    audio: ['mp3','wav','ogg','flac'],
+    document: ['pdf','doc','docx','xls','xlsx','txt'],
+    archive: ['zip','rar','7z','tar'],
+    program: ['exe','msi','app','dmg']
+  };
+  for (const [type, exts] of Object.entries(types)) {
+    if (exts.includes(ext)) return type;
+  }
+  return 'other';
+}
+
+function startUpload(file, friendlyName) {
+  const progressContainer = document.getElementById('progressContainer');
+  const progressBar = document.getElementById('progressBar');
+  const percentText = document.getElementById('percentText');
+  const uploadBtn = document.getElementById('uploadBtn');
+  
+  progressContainer.classList.remove('d-none');
+  progressBar.style.width = '0%';
+  percentText.textContent = '0%';
+  uploadBtn.disabled = true;
+  
+  socket.emit('Start', { Name: friendlyName, Size: file.size });
+}
+
+socket.on('MoreData', async ({ Place, Percent }) => {
+  if (!file) return;
+  
+  const start = Place * CHUNK_SIZE;
+  if (start >= file.size) return;
+  
+  const end = Math.min(start + CHUNK_SIZE, file.size);
+  const chunk = file.slice(start, end);
+  
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const bytes = new Uint8Array(e.target.result);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    socket.emit('Upload', {
+      Name: friendlyFileName,
+      Data: btoa(binary),
+      IsBase64: true
+    });
+  };
+  reader.readAsArrayBuffer(chunk);
+  
+  const currentPercent = Math.min(100, Math.round((end / file.size) * 100));
+  document.getElementById('progressBar').style.width = `${currentPercent}%`;
+  document.getElementById('percentText').textContent = `${currentPercent}%`;
+});
+
+socket.on('Done', () => {
+  document.getElementById('progressBar').classList.remove('progress-bar-animated');
+  document.getElementById('progressBar').classList.add('bg-success');
+  setTimeout(() => {
+    document.getElementById('progressContainer').classList.add('d-none');
+    document.getElementById('uploadBtn').disabled = false;
+    document.getElementById('fileInput').value = '';
+    document.getElementById('fileInfo').classList.add('d-none');
+    loadRecentFiles(); // Обновляем список файлов
+  }, 800);
+});
+
+socket.on('Error', ({ message }) => {
+  alert(`❌ Ошибка: ${message}`);
+  document.getElementById('uploadBtn').disabled = false;
+});
+</script>

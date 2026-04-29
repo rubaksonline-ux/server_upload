@@ -1,0 +1,56 @@
+<h2>{{title}}</h2>
+
+{{#if error}}
+<div class="alert alert-danger">{{error}}</div>
+{{/if}}
+
+{{#if files.length}}
+<div class="row g-3">
+  {{#each files}}
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100 shadow-sm file-card" onclick="openFilePreview(this)" style="cursor:pointer" data-file='{{json this}}'>
+      <div class="card-body text-center">
+        <div class="display-4 mb-2">{{fileIcon file_type}}</div>
+        <h6 class="card-title text-truncate">{{original_name}}</h6>
+        <small class="text-muted">{{formatBytes size}}</small>
+        <div class="mt-2">
+          <span class="badge bg-secondary">{{file_type}}</span>
+          {{#if owner}}
+          <span class="badge bg-info">{{owner}}</span>
+          {{/if}}
+        </div>
+      </div>
+      <div class="card-footer bg-transparent">
+        <small class="text-muted">Загружен: {{formatDate uploaded_at}}</small>
+      </div>
+    </div>
+  </div>
+  {{/each}}
+</div>
+{{else}}
+<div class="alert alert-info">
+  <p class="mb-0">У вас пока нет загруженных файлов. Начните загрузку!</p>
+</div>
+{{/if}}
+
+<script>
+// Helper для открытия превью
+function openFilePreview(card) {
+  const fileData = card.getAttribute('data-file');
+  try {
+    const file = JSON.parse(fileData);
+    if (typeof openFilePreview === 'function') {
+      window.openFilePreview(file);
+    }
+  } catch (err) {
+    console.error('Ошибка parsing данных файла:', err);
+  }
+}
+</script>
+
+<style>
+.file-card:hover {
+  transform: translateY(-2px);
+  transition: transform 0.2s ease;
+}
+</style>

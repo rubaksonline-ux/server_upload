@@ -1,0 +1,90 @@
+<!-- Modal предпросмотра файла -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="previewTitle">📄 Предпросмотр</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center" id="previewContent">
+        <!-- Динамический контент в зависимости от типа файла -->
+      </div>
+      <div class="modal-footer">
+        <a href="#" class="btn btn-primary" id="downloadBtn" download>⬇️ Скачать</a>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Функция для открытия модального окна с превью
+function openFilePreview(file) {
+  const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+  const content = document.getElementById('previewContent');
+  const title = document.getElementById('previewTitle');
+  const downloadBtn = document.getElementById('downloadBtn');
+  
+  title.textContent = file.original_name;
+  downloadBtn.href = `/download/${file.slug}`;
+  
+  const fileType = file.file_type || 'other';
+  const filePath = `/upload/${file.file_path || ''}/${file.friendly_name}`;
+  
+  let previewHTML = '';
+  
+  switch (fileType) {
+    case 'image':
+      previewHTML = `<img src="${filePath}" alt="${file.original_name}" class="img-fluid rounded" />`;
+      break;
+    
+    case 'video':
+      previewHTML = `
+        <video controls class="w-100 rounded">
+          <source src="${filePath}" type="${file.mime_type}">
+          Ваш браузер не поддерживает видео.
+        </video>`;
+      break;
+    
+    case 'audio':
+      previewHTML = `
+        <div class="py-4">
+          <div class="display-1 mb-3">🎵</div>
+          <audio controls class="w-100">
+            <source src="${filePath}" type="${file.mime_type}">
+            Ваш браузер не поддерживает аудио.
+          </audio>
+        </div>`;
+      break;
+    
+    default:
+      const icons = {
+        video: '🎬',
+        image: '🖼️',
+        audio: '🎵',
+        document: '📄',
+        archive: '📦',
+        program: '⚙️',
+        other: '📋'
+      };
+      previewHTML = `
+        <div class="py-5">
+          <div class="display-1 mb-3">${icons[fileType] || '📄'}</div>
+          <p class="text-muted">Предпросмотр недоступен для этого типа файла</p>
+          <p><strong>${file.original_name}</strong></p>
+          <small class="text-muted">${formatBytes(file.size)}</small>
+        </div>`;
+  }
+  
+  content.innerHTML = previewHTML;
+  modal.show();
+}
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+</script>
