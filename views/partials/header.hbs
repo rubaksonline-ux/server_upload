@@ -1,0 +1,45 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/">📤 FileUploader</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="/">Загрузка</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/files">Мои файлы</a>
+        </li>
+        {{#if user}}
+        <li class="nav-item">
+          <a class="nav-link" href="/admin" {{#unless isAdmin}}style="display:none"{{/unless}}>Все файлы</a>
+        </li>
+        {{/if}}
+      </ul>
+      <ul class="navbar-nav">
+        {{#if user}}
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+            👤 {{user.username}} ({{user.role}})
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="/profile">Профиль</a></li>
+            <li><a class="dropdown-item" href="/share-code">QR код</a></li>
+            <li><hr class="dropdown-divider"/></li>
+            <li><a class="dropdown-item" href="/logout">Выйти</a></li>
+          </ul>
+        </li>
+        {{else}}
+        <li class="nav-item">
+          <a class="nav-link" href="/login">Войти</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/register">Регистрация</a>
+        </li>
+        {{/if}}
+      </ul>
+    </div>
+  </div>
+</nav>

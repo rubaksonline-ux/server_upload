@@ -4,6 +4,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const { EventEmitter } = require('events');
+const cookieParser = require('cookie-parser');
 
 // ✅ Импортируем sequelize ПЕРЕД использованием
 const sequelize = require('./config/db.config');
@@ -15,6 +16,10 @@ const { ensureDirectory } = require('./utils/file.utils');
 const routes = require('./routes');
 const { handleStart, handleUpload, handleDisconnect } = require('./handlers/upload.handler');
 
+// Импорт моделей и middleware
+const { authMiddleware, User: UserModel } = require('./models/User.model');
+const hbs = require('./utils/handlebars-helpers');
+
 const init = async () => {
   try {
     // 1. Инициализация директорий
@@ -24,23 +29,44 @@ const init = async () => {
 
     // 2. Express app
     const app = express();
+    
+    // Настройка Handlebars
+    app.set('view engine', 'hbs');
+    app.set('views', path.join(__dirname, 'views'));
+    hbs.registerPartials(path.join(__dirname, 'views/partials'));
+    
+    // Middleware
     app.use(express.static(config.publicDir));
-    app.use('/', routes);
-
+    app.use(express.json());
+    app.use(express.urlencoded({ extended: true }));
+    app.use(cookieParser());
+    
+    // CORS настройки (безопасные)
+    const corsOrigins = process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000', 'http://127.0.0.1:3000'];
+    
     // 3. Подключаем роуты для файлов
     const fileRoutes = require('./routes/file.routes');
-    app.use('/', fileRoutes);
+    const authRoutes = require('./routes/auth.routes');
+    const filesRoutes = require('./routes/files.routes');
+    
+    app.use('/', routes);
+    app.use('/api/files', fileRoutes);
+    app.use('/auth', authRoutes);
+    app.use('/files', authMiddleware, filesRoutes);
 
     // 4. HTTP server
     const server = http.createServer(app);
     
-const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
-  maxHttpBufferSize: 1.5e8, 
-  // 100 MB — увеличьте при необходимости
-  pingTimeout: 60000,     // 60 сек таймаут пинга
-  pingInterval: 25000     // 25 сек интервал
-});	
+    const io = new Server(server, {
+      cors: { 
+        origin: corsOrigins, 
+        methods: ['GET', 'POST'],
+        credentials: true
+      },
+      maxHttpBufferSize: 1.5e8, 
+      pingTimeout: 60000,
+      pingInterval: 25000
+    });
 
     // 6. Глобальная шина событий для связи с БД (без модификации ядра)
     global.uploadBus = new EventEmitter();
@@ -52,7 +78,10 @@ const io = new Server(server, {
           friendlyName: data.friendlyName,
           size: data.size,
           originalName: data.originalName || data.friendlyName,
-          owner: 'anonymous'
+          owner: data.owner || 'anonymous',
+          fileType: data.fileType,
+          mimeType: data.mimeType,
+          filePath: data.filePath
         });
       } catch (err) {
         logger.error(`❌ Ошибка обработки события file:completed:`, { error: err.message });
