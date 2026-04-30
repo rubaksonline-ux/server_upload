@@ -1,0 +1,690 @@
+{{!-- 
+  Smart Uploader - App Controller
+  Основной контроллер приложения
+--}}
+
+<script>
+/**
+ * ============================================================================
+ * 🧩 ОСНОВНОЙ КОНТРОЛЛЕР
+ * ============================================================================
+ */
+const App = {
+  elements: {},
+  state: {
+    selectedFile: null, friendlyFileName: '', isFileMode: false, currentFileTypeLabel: '',
+    lastAnalysisResult: null, linkMetadata: null, isSaving: false
+  },
+  config: { CHUNK_SIZE: 524288, AUTO_UPLOAD_DELAY: 1000, ANALYSIS_DEBOUNCE: 300 },
+  socket: null,
+
+  init() {
+    Logger.log('App', '=== Инициализация ===');
+    this.cacheElements();
+    this.bindEvents();
+    this.initState();
+    this.setupSocket();
+    this.showToast('Готово! Введите текст или ссылку', false);
+  },
+
+  cacheElements() {
+    Logger.group('App', 'Кэширование элементов');
+    this.elements = {
+      universalInput: document.getElementById('universalInput'),
+      siteIconZone: document.getElementById('siteIconZone'),
+      pasteBtn: document.getElementById('pasteBtn'),
+      cameraBtn: document.getElementById('cameraBtn'),
+      uploadAnyBtn: document.getElementById('uploadAnyBtn'),
+      fileInfoContainer: document.getElementById('fileInfoContainer'),
+      analysisPanel: document.getElementById('analysisPanel'),
+      analysisResults: document.getElementById('analysisResults'),
+      clearAnalysisBtn: document.getElementById('clearAnalysisBtn'),
+      linkPreviewContainer: document.getElementById('linkPreviewContainer'),
+      editFormContainer: document.getElementById('editFormContainer'),
+      actionButtons: document.getElementById('actionButtons'),
+      saveBtn: document.getElementById('saveBtn'),
+      saveBtnText: document.getElementById('saveBtnText'),
+      cancelEditBtn: document.getElementById('cancelEditBtn'),
+      progressContainer: document.getElementById('progressContainer'),
+      progressBar: document.getElementById('progressBar'),
+      percentText: document.getElementById('percentText'),
+      uploadStatus: document.getElementById('uploadStatus'),
+      resultPreview: document.getElementById('resultPreview'),
+      previewImg: document.getElementById('previewImg')
+    };
+    Logger.log('App', `Найдено элементов: ${Object.keys(this.elements).length}`);
+    Logger.groupEnd();
+  },
+
+  initState() {
+    Logger.log('App', 'Сброс состояния');
+    this.state = {
+      selectedFile: null, friendlyFileName: '', isFileMode: false, currentFileTypeLabel: '',
+      lastAnalysisResult: null, linkMetadata: null, isSaving: false
+    };
+  },
+
+  setupSocket() {
+    Logger.log('App', 'Настройка Socket.io');
+    try {
+      this.socket = io();
+      this.socket.on('MoreData', this.handleMoreData.bind(this));
+      this.socket.on('Done', this.handleUploadDone.bind(this));
+      this.socket.on('Error', this.handleUploadError.bind(this));
+      // Новый обработчик для сохранения данных
+      this.socket.on('ItemSaved', this.handleItemSaved.bind(this));
+      Logger.log('App', 'Socket.io подключен');
+    } catch(e) { Logger.error('App', 'Ошибка Socket.io', e); }
+  },
+
+  bindEvents() {
+    Logger.group('App', 'Привязка событий');
+
+    this.elements.universalInput.addEventListener('input',
+      this.debounce(this.handleInput.bind(this), this.config.ANALYSIS_DEBOUNCE)
+    );
+
+    this.elements.pasteBtn?.addEventListener('click', this.handlePaste.bind(this));
+    this.elements.cameraBtn?.addEventListener('click', this.handleCamera.bind(this));
+    this.elements.uploadAnyBtn?.addEventListener('click', this.handleFileSelect.bind(this));
+    this.elements.clearAnalysisBtn?.addEventListener('click', this.clearAnalysis.bind(this));
+    this.elements.saveBtn?.addEventListener('click', this.handleSave.bind(this));
+    this.elements.cancelEditBtn?.addEventListener('click', this.clearAnalysis.bind(this));
+
+    this.elements.siteIconZone?.addEventListener('click', (e) => {
+      if (e.target.id === 'clearSiteIconBtn') { e.stopPropagation(); this.clearSiteIcon(); }
+    });
+
+    Logger.log('App', 'События привязаны');
+    Logger.groupEnd();
+  },
+
+  handleInput() {
+    Logger.log('App', 'Событие input');
+    if (this.state.selectedFile) this.resetFileSelection();
+
+    const value = this.elements.universalInput.value.trim();
+    ContentAnalyzer.isUrl(value) ? this.updateSiteIcon(value) : this.clearSiteIcon();
+
+    if (value) {
+      this.analyzeAndDisplay(value);
+      // Если URL — загружаем превью
+      if (ContentAnalyzer.isUrl(value)) {
+        this.fetchAndRenderLinkPreview(value);
+      }
+    } else {
+      this.hideAnalysisPanel();
+    }
+  },
+
+  async fetchAndRenderLinkPreview(url) {
+    Logger.log('App', 'Загрузка превью для:', url);
+
+    // Показываем индикатор загрузки
+    this.elements.linkPreviewContainer.innerHTML = `
+      <div class="preview-loading">
+        <div class="spinner"></div>
+        <span>Загружаем превью страницы...</span>
+      </div>
+    `;
+
+    try {
+      const metadata = await LinkPreview.fetchMetadata(url);
+      this.state.linkMetadata = metadata;
+
+      // Рендерим карточку
+      this.elements.linkPreviewContainer.innerHTML = LinkPreview.renderCard(metadata, true);
+
+      // Привязываем live preview
+      LinkPreview.bindLivePreview();
+
+      // Показываем кнопки действий
+      this.elements.actionButtons.classList.remove('d-none');
+
+      Logger.log('App', 'Превью успешно загружено', metadata);
+    } catch (error) {
+      Logger.error('App', 'Ошибка загрузки превью', error);
+      this.elements.linkPreviewContainer.innerHTML = `
+        <div class="alert alert-warning alert-sm mb-0">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          Не удалось загрузить превью. Ссылка будет сохранена как есть.
+        </div>
+      `;
+      this.elements.actionButtons.classList.remove('d-none');
+    }
+  },
+
+  analyzeAndDisplay(text) {
+    Logger.group('App', 'Анализ контента');
+    const result = ContentAnalyzer.analyze(text);
+    this.state.lastAnalysisResult = result;
+    this.elements.analysisResults.innerHTML = ContentAnalyzer.renderResult(result);
+    this.elements.analysisPanel.classList.remove('d-none');
+
+    // Для не-URL скрываем превью и кнопки
+    if (result.type !== 'url') {
+      this.elements.linkPreviewContainer.innerHTML = '';
+      this.elements.editFormContainer.innerHTML = '';
+      this.elements.actionButtons.classList.add('d-none');
+    }
+
+    Logger.log('App', 'Панель анализа обновлена');
+    Logger.groupEnd();
+  },
+
+  hideAnalysisPanel() {
+    this.elements.analysisPanel.classList.add('d-none');
+    this.elements.analysisResults.innerHTML = '';
+    this.elements.linkPreviewContainer.innerHTML = '';
+    this.elements.editFormContainer.innerHTML = '';
+    this.elements.actionButtons.classList.add('d-none');
+    this.state.lastAnalysisResult = null;
+    this.state.linkMetadata = null;
+    Logger.log('App', 'Панель анализа скрыта');
+  },
+
+  clearAnalysis() {
+    Logger.log('App', 'Очистка анализа');
+    this.hideAnalysisPanel();
+    this.elements.universalInput.value = '';
+    this.clearSiteIcon();
+  },
+
+  updateSiteIcon(url) {
+    Logger.log('App', 'Обновление иконки сайта:', url);
+    try {
+      let urlToParse = url.trim();
+      if (!/^https?:\/\//i.test(urlToParse)) urlToParse = 'https://' + urlToParse;
+      const urlObj = new URL(urlToParse);
+      const hostname = urlObj.hostname;
+      if (!hostname) { this.clearSiteIcon(); return; }
+
+      const faviconUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+      const displayDomain = hostname.replace(/^www\./, '');
+
+      this.elements.siteIconZone.innerHTML = `
+        <div class="site-icon-preview" id="dynamicSitePreview">
+          <img src="${faviconUrl}" alt="favicon" referrerpolicy="no-referrer"
+               onerror="this.onerror=null; this.style.display='none'; this.parentElement.querySelector('.fallback-i')?.style.removeProperty('display');">
+          <i class="bi bi-globe2 fallback-i" style="display: none;"></i>
+          <span class="small">${displayDomain}</span>
+          <button type="button" class="btn-close btn-close-sm ms-1" id="clearSiteIconBtn" style="font-size: 0.5rem; width:0.8rem;"></button>
+        </div>
+      `;
+      Logger.log('App', 'Иконка сайта установлена');
+    } catch(e) { Logger.warn('App', 'Ошибка иконки сайта', e); this.clearSiteIcon(); }
+  },
+
+  clearSiteIcon() { this.elements.siteIconZone.innerHTML = ''; Logger.log('App', 'Иконка очищена'); },
+
+  // === ОБРАБОТКА СОХРАНЕНИЯ ===
+
+  async handleSave() {
+    Logger.group('App', 'Обработка сохранения');
+
+    if (this.state.isSaving) {
+      Logger.log('App', 'Уже сохраняется, игнорируем');
+      return;
+    }
+
+    const result = this.state.lastAnalysisResult;
+    if (!result) {
+      Logger.warn('App', 'Нет данных для сохранения');
+      this.showToast('Нечего сохранять', true);
+      Logger.groupEnd();
+      return;
+    }
+
+    // Собираем данные для сохранения
+    const saveData = {
+      type: result.type,
+      originalValue: result.value,
+      title: null,
+      slug: null,
+      metadata: null,
+      timestamp: new Date().toISOString()
+    };
+
+    // Если есть форма редактирования — берём значения из неё
+    const editTitle = document.getElementById('editTitle');
+    const editSlug = document.getElementById('editSlug');
+
+    if (editTitle && editSlug) {
+      saveData.title = editTitle.value.trim() || result.value;
+      saveData.slug = editSlug.value.trim() || LinkPreview.generateSlug(saveData.title);
+      saveData.metadata = this.state.linkMetadata;
+    } else {
+      // Фоллбэк: авто-значения
+      saveData.title = result.type === 'url' ? (this.state.linkMetadata?.title || result.value) : result.value;
+      saveData.slug = LinkPreview.generateSlug(saveData.title);
+    }
+
+    Logger.log('App', 'Данные для сохранения:', saveData);
+
+    // UI: состояние "сохранение"
+    this.state.isSaving = true;
+    this.elements.saveBtn.classList.add('saving');
+    this.elements.saveBtn.disabled = true;
+    this.elements.saveBtnText.textContent = 'Сохранение...';
+
+    try {
+      // Отправляем на сервер через Socket
+      if (this.socket?.connected) {
+        Logger.log('App', 'Отправка события SaveItem на сервер');
+        this.socket.emit('SaveItem', saveData);
+
+        // Ждём ответ с таймаутом
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Timeout')), 10000);
+          const handler = (response) => {
+            clearTimeout(timeout);
+            this.socket.off('ItemSaved', handler);
+            if (response.success) resolve(response);
+            else reject(new Error(response.error || 'Ошибка сервера'));
+          };
+          this.socket.once('ItemSaved', handler);
+        });
+
+        Logger.log('App', 'Сервер подтвердил сохранение');
+        this.showToast('✅ Сохранено!', false);
+
+        // UI: состояние "успех"
+        this.elements.saveBtn.classList.remove('saving');
+        this.elements.saveBtn.classList.add('saved');
+        this.elements.saveBtnText.textContent = '✓ Сохранено';
+
+        // Скрываем форму через 1.5 сек
+        setTimeout(() => {
+          this.clearAnalysis();
+          this.elements.saveBtn.classList.remove('saved');
+          this.elements.saveBtnText.textContent = 'Сохранить';
+        }, 1500);
+
+      } else {
+        // Фоллбэк: локальное сохранение (для демо)
+        Logger.warn('App', 'Socket не подключен, сохраняем локально');
+        this.saveLocally(saveData);
+        this.showToast('✅ Сохранено локально', false);
+        setTimeout(() => this.clearAnalysis(), 1500);
+      }
+
+    } catch (error) {
+      Logger.error('App', 'Ошибка сохранения', error);
+      this.showToast(`❌ Ошибка: ${error.message}`, true);
+
+      // Возвращаем кнопку в исходное состояние
+      this.elements.saveBtn.classList.remove('saving');
+      this.elements.saveBtn.disabled = false;
+      this.elements.saveBtnText.textContent = 'Сохранить';
+    }
+
+    this.state.isSaving = false;
+    Logger.groupEnd();
+  },
+
+  handleItemSaved(response) {
+    Logger.log('App', 'Получен ответ ItemSaved от сервера', response);
+    if (response.success) {
+      this.showToast('✅ Сохранено на сервере!', false);
+    } else {
+      this.showToast(`⚠️ ${response.error || 'Ошибка сервера'}`, true);
+    }
+  },
+
+  saveLocally(data) {
+    Logger.log('App', 'Локальное сохранение', data);
+    try {
+      const key = 'smartUploaderItems';
+      const items = JSON.parse(localStorage.getItem(key) || '[]');
+      items.unshift({ id: Date.now(), ...data });
+      localStorage.setItem(key, JSON.stringify(items.slice(0, 100))); // Храним последние 100
+      Logger.log('App', `Сохранено в localStorage, всего записей: ${items.length}`);
+    } catch(e) {
+      Logger.error('App', 'Ошибка localStorage', e);
+    }
+  },
+
+  // === ОБРАБОТКА ФАЙЛОВ ===
+  handleFileSelected(file) {
+    Logger.group('App', 'Файл выбран');
+    Logger.log('App', 'Файл:', { name: file.name, size: file.size, type: file.type });
+    if (!file) { Logger.warn('App', 'Пустой файл'); Logger.groupEnd(); return; }
+
+    this.state.selectedFile = file;
+    this.state.friendlyFileName = this.transliterateFilename(file.name);
+    this.state.currentFileTypeLabel = this.detectFileType(file.name);
+    this.renderFileInfo(file);
+    this.hideAnalysisPanel();
+    this.elements.universalInput.value = `📁 ${file.name} (${(file.size/1024/1024).toFixed(2)} MB)`;
+    this.clearSiteIcon();
+
+    if (window.autoUploadTimer) clearTimeout(window.autoUploadTimer);
+    window.autoUploadTimer = setTimeout(() => {
+      if (this.state.selectedFile && this.state.isFileMode) {
+        Logger.log('App', 'Автозагрузка файла');
+        this.startUploadFile(this.state.selectedFile, this.state.friendlyFileName);
+      }
+    }, this.config.AUTO_UPLOAD_DELAY);
+    Logger.groupEnd();
+  },
+
+  renderFileInfo(file) {
+    const sizeMB = (file.size / (1024*1024)).toFixed(2);
+    const icons = { video:'🎬', image:'🖼️', audio:'🎵', document:'📄', archive:'🗜️', program:'⚙️', other:'📎' };
+    const icon = icons[this.state.currentFileTypeLabel] || '📁';
+
+    this.elements.fileInfoContainer.innerHTML = `
+      <div class="file-info-panel fade-in-up">
+        <div class="file-info-row"><span class="file-info-label">${icon} Тип:</span><span class="badge-type">${this.state.currentFileTypeLabel.toUpperCase()}</span></div>
+        <div class="file-info-row"><span class="file-info-label">📄 Оригинал:</span><span class="file-info-value">${ContentAnalyzer.escapeHtml(file.name)}</span></div>
+        <div class="file-info-row"><span class="file-info-label">✨ Друж.имя:</span><span class="file-info-value">${ContentAnalyzer.escapeHtml(this.state.friendlyFileName)}</span></div>
+        <div class="file-info-row"><span class="file-info-label">💾 Размер:</span><span class="file-info-value">${sizeMB} MB</span></div>
+        <div class="small text-muted mt-2"><i class="bi bi-cloud-upload"></i> Загрузка начнётся автоматически...</div>
+      </div>
+    `;
+    this.state.isFileMode = true;
+  },
+
+  handleCamera() { Logger.log('App', 'Открытие камеры'); this.openFilePicker({ accept:'image/*', capture:'environment', multiple:false }); },
+  handleFileSelect() { Logger.log('App', 'Выбор файла'); this.openFilePicker({ accept:'*/*', multiple:false }); },
+
+  openFilePicker(options = {}) {
+    Logger.log('App', 'File picker:', options);
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = options.accept || '*/*';
+    if (options.capture) input.setAttribute('capture', options.capture);
+    if (options.multiple) input.multiple = true;
+    input.style.display = 'none';
+
+    input.onchange = (e) => {
+      Logger.log('App', 'Файл выбран');
+      if (input.files?.[0]) this.handleFileSelected(input.files[0]);
+      document.body.removeChild(input);
+    };
+    input.onerror = (e) => { Logger.error('App', 'Ошибка file picker', e); this.showToast('Ошибка выбора файла', true); document.body.removeChild(input); };
+
+    document.body.appendChild(input);
+    input.click();
+  },
+
+  async handlePaste() {
+    Logger.log('App', 'Paste clicked');
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        Logger.log('App', 'Clipboard text:', text.substring(0,100) + (text.length>100?'...':''));
+        this.elements.universalInput.value = text;
+        this.elements.universalInput.dispatchEvent(new Event('input', { bubbles:true }));
+        this.showToast(`Вставлено: ${text.length>40?text.substr(0,40)+'…':text}`);
+        this.resetFileSelection();
+      } else { Logger.warn('App', 'Clipboard empty'); this.showToast('Буфер пуст', true); }
+    } catch(err) { Logger.error('App', 'Clipboard access denied', err); this.showToast('Нет доступа к буферу', true); }
+  },
+
+  // === ЗАГРУЗКА ФАЙЛОВ ===
+  startUploadFile(file, friendlyName) {
+    Logger.group('App', 'Начало загрузки');
+    Logger.log('App', 'Параметры:', { name: friendlyName, size: file.size });
+
+    this.elements.progressContainer.classList.remove('d-none');
+    this.elements.resultPreview.classList.add('d-none');
+    this.elements.progressBar.style.width = '0%';
+    this.elements.percentText.textContent = '0%';
+    this.elements.progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-primary';
+    this.elements.uploadStatus.textContent = `⏫ Отправка ${friendlyName}...`;
+
+    this.setButtonsEnabled(false);
+    this.socket?.emit('Start', { Name: friendlyName, Size: file.size });
+
+    window.currentUploadFile = file;
+    window.currentFriendly = friendlyName;
+    Logger.log('App', 'Start отправлен');
+    Logger.groupEnd();
+  },
+
+  handleMoreData({ Place, Percent }) {
+    Logger.log('App', 'MoreData:', { Place, Percent });
+    const file = window.currentUploadFile;
+    if (!file) { Logger.warn('App', 'No file'); return; }
+
+    const start = Place * this.config.CHUNK_SIZE;
+    if (start >= file.size) { Logger.log('App', 'EOF'); return; }
+
+    const end = Math.min(start + this.config.CHUNK_SIZE, file.size);
+    const chunk = file.slice(start, end);
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      const bytes = new Uint8Array(e.target.result);
+      let binary = '';
+      for (let i=0; i<bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      const base64 = btoa(binary);
+
+      this.socket?.emit('Upload', { Name: window.currentFriendly, Data: base64, IsBase64: true });
+
+      const percentDone = Math.min(100, Math.round((end/file.size)*100));
+      this.elements.progressBar.style.width = `${percentDone}%`;
+      this.elements.percentText.textContent = `${percentDone}%`;
+      Logger.log('App', `Chunk sent: ${start}-${end} (${percentDone}%)`);
+    };
+    reader.onerror = (e) => { Logger.error('App', 'Chunk read error', e); this.showToast('Ошибка чтения', true); };
+    reader.readAsArrayBuffer(chunk);
+  },
+
+  handleUploadDone({ Image, success, warning, DownloadUrl }) {
+    Logger.log('App', 'Upload done:', { success, warning, hasImage: !!Image, hasDownloadUrl: !!DownloadUrl });
+
+    this.elements.uploadStatus.innerHTML = success
+      ? '<i class="bi bi-check-circle-fill text-success"></i> Загружен!'
+      : `<i class="bi bi-exclamation-triangle text-warning"></i> ${warning||'Предупреждение'}`;
+
+    this.elements.progressBar.classList.remove('progress-bar-animated');
+    this.elements.progressBar.classList.add(success ? 'bg-success' : 'bg-warning');
+
+    // === Отображение результата загрузки ===
+    if (success) {
+      this.renderUploadResult({
+        fileName: window.currentFriendly || this.state.friendlyFileName,
+        fileType: this.state.currentFileTypeLabel,
+        fileSize: this.state.selectedFile?.size || 0,
+        imageBase64: Image,
+        downloadUrl: DownloadUrl
+      });
+    }
+
+    // Скрываем прогресс через 1.5 сек
+    setTimeout(() => {
+      this.elements.progressContainer.classList.add('d-none');
+    }, 1500);
+
+    this.resetFileSelection();
+    this.setButtonsEnabled(true);
+    window.currentUploadFile = null;
+  },
+
+  renderUploadResult({ fileName, fileType, fileSize, imageBase64, downloadUrl }) {
+    Logger.log('App', 'Рендер результата:', { fileName, fileType, fileSize });
+
+    const fileConfig = {
+      image: { icon: '🖼️', class: 'image', label: 'Изображение' },
+      video: { icon: '🎬', class: 'video', label: 'Видео' },
+      audio: { icon: '🎵', class: 'audio', label: 'Аудио' },
+      document: { icon: '📄', class: 'document', label: 'Документ' },
+      archive: { icon: '🗜️', class: 'other', label: 'Архив' },
+      other: { icon: '📎', class: 'other', label: 'Файл' }
+    };
+
+    const config = fileConfig[fileType] || fileConfig.other;
+    const sizeFormatted = fileSize
+      ? (fileSize < 1024*1024
+          ? `${(fileSize/1024).toFixed(1)} KB`
+          : `${(fileSize/1024/1024).toFixed(2)} MB`)
+      : '';
+
+    let fileUrl = '#';
+    let isDirectDownload = false;
+
+    if (downloadUrl) {
+      fileUrl = downloadUrl;
+      isDirectDownload = true;
+    } else if (imageBase64 && fileType === 'image') {
+      fileUrl = `data:image/jpeg;base64,${imageBase64}`;
+      isDirectDownload = true;
+    } else if (this.state.selectedFile) {
+      fileUrl = URL.createObjectURL(this.state.selectedFile);
+    }
+
+    let previewHtml = '';
+    if (fileType === 'image' && imageBase64) {
+      previewHtml = `
+        <div class="file-preview-container">
+          <img src="data:image/jpeg;base64,${imageBase64}" alt="${ContentAnalyzer.escapeHtml(fileName)}"
+               onerror="this.parentElement.innerHTML='<div class=\\'file-preview-placeholder\\'><i class=\\'bi bi-image\\'></i>Предпросмотр недоступен</div>'">
+        </div>
+      `;
+    } else if (fileType === 'video') {
+      const videoSrc = downloadUrl || (this.state.selectedFile ? URL.createObjectURL(this.state.selectedFile) : '');
+      previewHtml = videoSrc
+        ? `<div class="file-preview-container"><video src="${videoSrc}" controls preload="metadata"></video></div>`
+        : `<div class="file-preview-container"><div class="file-preview-placeholder"><i class="bi bi-film"></i>Видео загружено</div></div>`;
+    } else if (fileType === 'audio') {
+      const audioSrc = downloadUrl || (this.state.selectedFile ? URL.createObjectURL(this.state.selectedFile) : '');
+      previewHtml = audioSrc
+        ? `<div class="file-preview-container px-3"><audio src="${audioSrc}" controls class="w-100"></audio></div>`
+        : `<div class="file-preview-container"><div class="file-preview-placeholder"><i class="bi bi-music-note-beamed"></i>Аудио загружено</div></div>`;
+    } else {
+      previewHtml = `
+        <div class="file-preview-container">
+          <div class="file-preview-placeholder">
+            <i class="bi bi-file-earmark-text fs-4"></i>
+            <span>Файл готов к скачиванию</span>
+          </div>
+        </div>
+      `;
+    }
+
+    const resultHtml = `
+      <div class="upload-result-card">
+        <div class="upload-result-header">
+          <div class="file-type-icon ${config.class}">${config.icon}</div>
+          <div class="file-info-main">
+            <div class="file-name">${ContentAnalyzer.escapeHtml(fileName)}</div>
+            <div class="file-meta">
+              <span><i class="bi bi-tag"></i> ${config.label}</span>
+              ${sizeFormatted ? `<span><i class="bi bi-hdd"></i> ${sizeFormatted}</span>` : ''}
+              <span><i class="bi bi-check-circle text-success"></i> Готов</span>
+            </div>
+          </div>
+        </div>
+        ${previewHtml}
+        <div class="file-actions">
+          <button class="btn btn-reupload" onclick="App.clearAnalysis(); App.elements.universalInput.focus();">
+            <i class="bi bi-arrow-repeat"></i> Ещё
+          </button>
+          <a href="${fileUrl}" class="btn-download" ${!isDirectDownload && fileType !== 'image' ? 'download="'+ContentAnalyzer.escapeHtml(fileName)+'"' : ''} target="${isDirectDownload && fileType !== 'image' ? '_blank' : ''}">
+            <i class="bi bi-download"></i> Скачать
+          </a>
+        </div>
+      </div>
+    `;
+
+    this.elements.resultPreview.innerHTML = resultHtml;
+    this.elements.resultPreview.classList.remove('d-none');
+
+    Logger.log('App', 'Карточка результата отрисована');
+  },
+
+  handleUploadError({ message }) {
+    Logger.error('App', 'Upload error:', message);
+    this.elements.uploadStatus.innerHTML = `❌ Ошибка: ${message}`;
+    this.elements.progressBar.classList.add('bg-danger');
+    this.elements.progressBar.classList.remove('progress-bar-animated');
+    this.setButtonsEnabled(true);
+    setTimeout(() => this.elements.progressContainer.classList.add('d-none'), 2000);
+    this.resetFileSelection();
+    this.showToast('Ошибка загрузки: ' + message, true);
+  },
+
+  // === ВСПОМОГАТЕЛЬНЫЕ ===
+  resetFileSelection() {
+    Logger.log('App', 'Reset file selection');
+
+    if (this.state.selectedFile && window._fileObjectUrl) {
+      URL.revokeObjectURL(window._fileObjectUrl);
+      delete window._fileObjectUrl;
+    }
+
+    this.state.selectedFile = null;
+    this.state.isFileMode = false;
+    this.state.friendlyFileName = '';
+    this.state.currentFileTypeLabel = '';
+    this.elements.fileInfoContainer.innerHTML = '';
+
+    if (window.autoUploadTimer) {
+      clearTimeout(window.autoUploadTimer);
+      delete window.autoUploadTimer;
+    }
+  },
+
+  setButtonsEnabled(enabled) {
+    [this.elements.pasteBtn, this.elements.cameraBtn, this.elements.uploadAnyBtn].forEach(btn => {
+      if (btn) enabled ? btn.removeAttribute('disabled') : btn.setAttribute('disabled', 'disabled');
+    });
+    Logger.log('App', `Buttons ${enabled?'enabled':'disabled'}`);
+  },
+
+  detectFileType(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const types = {
+      video: ['mp4','webm','mkv','avi','mov','m4v'], image: ['jpg','jpeg','png','gif','webp','bmp','svg'],
+      audio: ['mp3','wav','ogg','flac','m4a'], document: ['pdf','doc','docx','xls','xlsx','txt','md'],
+      archive: ['zip','rar','7z','tar','gz'], program: ['exe','msi','app','dmg']
+    };
+    for (const [type, exts] of Object.entries(types)) if (exts.includes(ext)) return type;
+    return 'other';
+  },
+
+  transliterateFilename(filename) {
+    const lastDot = filename.lastIndexOf('.');
+    const ext = lastDot !== -1 ? filename.slice(lastDot) : '';
+    let base = lastDot !== -1 ? filename.slice(0, lastDot) : filename;
+
+    const cyr = "абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ";
+    const lat = "abvgdeejzijklmnoprstufhczchssh'yieyuABVGDEEJZIJKLMNOPRSTUFHCZCHSSH'YIEYU";
+    for (let i=0; i<cyr.length; i++) base = base.split(cyr[i]).join(lat[i]);
+
+    return (base.toLowerCase().trim().replace(/[_\s]+/g,'-').replace(/[^a-z0-9-]+/g,'').replace(/-+/g,'-').replace(/^-+|-+$/g,'') || 'file') + ext;
+  },
+
+  debounce(func, wait) {
+    let timeout;
+    return (...args) => { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), wait); };
+  },
+
+  showToast(msg, isError = false) {
+    let toast = document.getElementById('dynamicToastMsg');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'dynamicToastMsg';
+      toast.className = 'toast-msg';
+      document.body.appendChild(toast);
+    }
+    toast.style.backgroundColor = isError ? '#b91c1cdd' : '#1f2937ee';
+    toast.innerHTML = `<i class="bi ${isError?'bi-exclamation-triangle':'bi-info-circle'} me-1"></i> ${msg}`;
+    toast.style.opacity = '1'; toast.style.visibility = 'visible';
+    setTimeout(() => { toast.style.opacity='0'; setTimeout(()=>toast.style.visibility='hidden',300); }, 2200);
+    Logger.log('App', `Toast: ${msg}`);
+  }
+};
+
+// === ЗАПУСК ===
+document.addEventListener('DOMContentLoaded', () => {
+  Logger.log('Global', 'DOM loaded, starting app');
+  App.init();
+});
+
+window.addEventListener('error', (e) => {
+  Logger.error('Global', 'Uncaught error', { message: e.message, source: e.filename, lineno: e.lineno, colno: e.colno });
+});
+</script>

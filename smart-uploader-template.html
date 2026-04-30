@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes"/>
+  <title>Smart Uploader — текст, фото, ссылки, файлы</title>
+  
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  
+  <!-- Стили компонента -->
+  <style>
+    :root {
+      --primary-color: #4f46e5;
+      --primary-hover: #4338ca;
+      --success-color: #10b981;
+      --danger-color: #ef4444;
+      --warning-color: #f59e0b;
+      --bg-light: #f9fafb;
+      --border-color: #e5e7eb;
+      --text-dark: #1f2937;
+      --text-muted: #6b7280;
+    }
+
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 2rem 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .main-card {
+      border: none;
+      border-radius: 1rem;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+
+    .card-header-custom {
+      background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+      padding: 1.5rem;
+    }
+
+    .smart-input-group {
+      background: var(--bg-light);
+      border: 2px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 0.75rem;
+      transition: all 0.3s ease;
+    }
+
+    .smart-input-group:focus-within {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+
+    .form-control-smart {
+      border: none;
+      background: transparent;
+      font-size: 1rem;
+      padding: 0.5rem;
+      outline: none;
+      flex-grow: 1;
+    }
+
+    .btn-icon-action {
+      width: 40px;
+      height: 40px;
+      border-radius: 0.5rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      border: 1px solid var(--border-color);
+      color: var(--text-dark);
+      transition: all 0.2s ease;
+    }
+
+    .btn-icon-action:hover {
+      background: var(--primary-color);
+      border-color: var(--primary-color);
+      color: white;
+      transform: translateY(-2px);
+    }
+
+    .analysis-panel {
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      margin-top: 1rem;
+      animation: fadeInUp 0.3s ease;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .analysis-result {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+      background: var(--bg-light);
+      border-radius: 0.5rem;
+    }
+
+    .analysis-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+
+    .analysis-icon.url { background: #dbeafe; }
+    .analysis-icon.telegram { background: #dbeafe; }
+    .analysis-icon.email { background: #fef3c7; }
+    .analysis-icon.phone { background: #d1fae5; }
+    .analysis-icon.gps { background: #fee2e2; }
+    .analysis-icon.text { background: #e5e7eb; }
+
+    .site-icon-preview {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: white;
+      border: 1px solid var(--border-color);
+      padding: 0.25rem 0.75rem;
+      border-radius: 2rem;
+      font-size: 0.875rem;
+    }
+
+    .site-icon-preview img {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Link Preview Card */
+    .link-preview-card {
+      display: flex;
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      overflow: hidden;
+      background: white;
+      margin: 1rem 0;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .link-preview-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    }
+
+    .link-preview-image {
+      width: 120px;
+      min-height: 120px;
+      background: var(--bg-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      color: var(--text-muted);
+    }
+
+    .link-preview-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .link-preview-image.placeholder {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .link-preview-content {
+      flex: 1;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .link-preview-title {
+      font-weight: 600;
+      font-size: 1rem;
+      color: var(--text-dark);
+      line-height: 1.4;
+    }
+
+    .link-preview-description {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .link-preview-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: auto;
+    }
+
+    .link-preview-meta img {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Edit Form */
+    .edit-form {
+      border-top: 1px solid var(--border-color);
+      padding-top: 1rem;
+      margin-top: 1rem;
+    }
+
+    .edit-form-label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.375rem;
+    }
+
+    .edit-form-input {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border-color);
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+      transition: border-color 0.2s ease;
+    }
+
+    .edit-form-input:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+
+    .slug-hint {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.375rem;
+    }
+
+    .slug-hint code {
+      background: var(--bg-light);
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+      font-size: 0.7rem;
+    }
+
+    /* Action Buttons */
+    .save-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .btn-cancel {
+      flex: 1;
+      padding: 0.625rem 1rem;
+      border: 1px solid var(--border-color);
+      background: white;
+      color: var(--text-dark);
+      border-radius: 0.5rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .btn-cancel:hover {
+      background: var(--bg-light);
+    }
+
+    .btn-save {
+      flex: 2;
+      padding: 0.625rem 1rem;
+      border: none;
+      background: var(--primary-color);
+      color: white;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .btn-save:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-save.saving {
+      background: var(--text-muted);
+      cursor: wait;
+    }
+
+    .btn-save.saved {
+      background: var(--success-color);
+    }
+
+    /* Progress Bar */
+    .progress-custom {
+      height: 8px;
+      border-radius: 4px;
+      background: var(--bg-light);
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      transition: width 0.3s ease;
+    }
+
+    /* File Info Panel */
+    .file-info-panel {
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      margin-top: 1rem;
+    }
+
+    .file-info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .file-info-row:last-child {
+      border-bottom: none;
+    }
+
+    .file-info-label {
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .file-info-value {
+      font-weight: 600;
+      color: var(--text-dark);
+    }
+
+    .badge-type {
+      background: var(--primary-color);
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 2rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    /* Upload Result Card */
+    .upload-result-card {
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      margin-top: 1rem;
+      animation: fadeInUp 0.3s ease;
+    }
+
+    .upload-result-header {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .file-type-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+    }
+
+    .file-type-icon.image { background: #dbeafe; }
+    .file-type-icon.video { background: #ede9fe; }
+    .file-type-icon.audio { background: #fef3c7; }
+    .file-type-icon.document { background: #e5e7eb; }
+    .file-type-icon.other { background: #f3f4f6; }
+
+    .file-info-main {
+      flex: 1;
+    }
+
+    .file-name {
+      font-weight: 600;
+      color: var(--text-dark);
+      margin-bottom: 0.25rem;
+    }
+
+    .file-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .file-preview-container {
+      margin: 1rem 0;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      background: var(--bg-light);
+    }
+
+    .file-preview-container img {
+      width: 100%;
+      max-height: 300px;
+      object-fit: contain;
+    }
+
+    .file-preview-container video {
+      width: 100%;
+      max-height: 300px;
+    }
+
+    .file-preview-placeholder {
+      padding: 3rem;
+      text-align: center;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .file-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .btn-reupload {
+      flex: 1;
+      padding: 0.625rem 1rem;
+      border: 1px solid var(--border-color);
+      background: white;
+      color: var(--text-dark);
+      border-radius: 0.5rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .btn-reupload:hover {
+      background: var(--bg-light);
+    }
+
+    .btn-download {
+      flex: 2;
+      padding: 0.625rem 1rem;
+      border: none;
+      background: var(--success-color);
+      color: white;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      text-decoration: none;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+
+    .btn-download:hover {
+      background: #059669;
+      color: white;
+      transform: translateY(-1px);
+    }
+
+    /* Toast Notification */
+    .toast-msg {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--text-dark);
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 2rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      z-index: 9999;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    /* Preview Loading */
+    .preview-loading {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1.5rem;
+      justify-content: center;
+      color: var(--text-muted);
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid var(--border-color);
+      border-top-color: var(--primary-color);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Responsive */
+    @media (max-width: 576px) {
+      .link-preview-card {
+        flex-direction: column;
+      }
+      
+      .link-preview-image {
+        width: 100%;
+        min-height: 160px;
+      }
+      
+      .file-actions {
+        flex-direction: column;
+      }
+      
+      .btn-icon-action {
+        width: 36px;
+        height: 36px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="main-card card">
+    <div class="card-header-custom text-white">
+      <h4 class="mb-0 fw-semibold"><i class="bi bi-cloud-arrow-up-fill me-2"></i>Smart Uploader</h4>
+      <p class="small mb-0 opacity-75">Текст, ссылка, фото или файл — всё в одном поле</p>
+    </div>
+    <div class="card-body p-4">
+
+      <!-- УНИВЕРСАЛЬНОЕ ПОЛЕ ВВОДА + ИКОНКИ -->
+      <div class="smart-input-group d-flex align-items-center flex-wrap">
+        <div id="siteIconZone" class="me-2"></div>
+        <input type="text" class="form-control-smart flex-grow-1" id="universalInput"
+               placeholder="Вставьте ссылку, текст, или выберите файл через иконки..." autocomplete="off">
+        <div class="d-flex gap-1 ms-2">
+          <button class="btn btn-icon-action" id="pasteBtn" title="Вставить из буфера"><i class="bi bi-clipboard-plus fs-6"></i></button>
+          <button class="btn btn-icon-action" id="cameraBtn" title="Сделать фото"><i class="bi bi-camera fs-6"></i></button>
+          <button class="btn btn-icon-action" id="uploadAnyBtn" title="Загрузить файл"><i class="bi bi-paperclip fs-6"></i></button>
+        </div>
+      </div>
+
+      <!-- ПАНЕЛЬ АНАЛИЗА КОНТЕНТА -->
+      <div id="analysisPanel" class="analysis-panel d-none">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-search me-1"></i>Результат анализа</h6>
+          <button class="btn btn-sm btn-outline-secondary" id="clearAnalysisBtn" title="Очистить">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <div id="analysisResults"></div>
+
+        <!-- Контейнер для превью ссылки -->
+        <div id="linkPreviewContainer"></div>
+
+        <!-- Контейнер для формы редактирования -->
+        <div id="editFormContainer"></div>
+
+        <!-- Кнопки действий -->
+        <div id="actionButtons" class="save-actions d-none">
+          <button class="btn btn-cancel" id="cancelEditBtn">
+            <i class="bi bi-x-circle"></i> Отмена
+          </button>
+          <button class="btn btn-save" id="saveBtn">
+            <i class="bi bi-check-lg"></i> <span id="saveBtnText">Сохранить</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ИНФОРМАЦИЯ О ФАЙЛЕ -->
+      <div id="fileInfoContainer" style="min-height: 0px;"></div>
+
+      <!-- ПРОГРЕСС ЗАГРУЗКИ -->
+      <div id="progressContainer" class="mt-4 d-none">
+        <div class="d-flex justify-content-between mb-1">
+          <small><i class="bi bi-arrow-repeat"></i> Загрузка файла...</small>
+          <small id="percentText" class="fw-bold">0%</small>
+        </div>
+        <div class="progress-custom progress">
+          <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+               role="progressbar" style="width: 0%"></div>
+        </div>
+        <div id="uploadStatus" class="mt-2 small text-muted text-center"></div>
+      </div>
+
+      <!-- ПРЕВЬЮ РЕЗУЛЬТАТА -->
+      <div id="resultPreview" class="mt-4 d-none text-center"></div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Библиотеки -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+<script>
+/**
+ * ============================================================================
+ * 📋 МОДУЛЬ ЛОГИРОВАНИЯ
+ * ============================================================================
+ */
+const Logger = {
+  enabled: true,
+  prefix: '[SmartUploader]',
+
+  log(module, message, data = null) {
+    if (!this.enabled) return;
+    const timestamp = new Date().toISOString().split('T')[1].slice(0,8);
+    const logMsg = `${this.prefix}[${module}][${timestamp}] ${message}`;
+    data !== null ? console.log(logMsg, data) : console.log(logMsg);
+  },
+
+  warn(module, message, data = null) {
+    if (!this.enabled) return;
+    const timestamp = new Date().toISOString().split('T')[1].slice(0,8);
+    const logMsg = `${this.prefix}[${module}][WARN][${timestamp}] ${message}`;
+    data !== null ? console.warn(logMsg, data) : console.warn(logMsg);
+  },
+
+  error(module, message, error = null) {
+    const timestamp = new Date().toISOString().split('T')[1].slice(0,8);
+    const logMsg = `${this.prefix}[${module}][ERROR][${timestamp}] ${message}`;
+    if (error instanceof Error) console.error(logMsg, error);
+    else if (error !== null) console.error(logMsg, error);
+    else console.error(logMsg);
+  },
+
+  group(module, label) { if (this.enabled) console.group(`${this.prefix}[${module}] ${label}`); },
+  groupEnd() { if (this.enabled) console.groupEnd(); }
+};
+
+/**
+ * ============================================================================
+ * 🔗 МОДУЛЬ ПРЕВЬЮ ССЫЛОК (Link Preview)
+ * ============================================================================
+ */
+const LinkPreview = {
+  // Настройки
+  config: {
+    apiUrl: '/api/preview',
+    fallbackTimeout: 5000,
+    maxImageSize: 5 * 1024 * 1024
+  },
+
+  async fetchMetadata(url) {
+    Logger.group('LinkPreview', `Запрос метаданных: ${url}`);
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.config.fallbackTimeout);
+
+      const response = await fetch(`${this.config.apiUrl}?url=${encodeURIComponent(url)}`, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' }
+      });
+      clearTimeout(timeout);
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      Logger.log('LinkPreview', 'Успешный ответ от API', data);
+      Logger.groupEnd();
+      return this.normalizeMetadata(data, url);
+
+    } catch (apiError) {
+      Logger.warn('LinkPreview', 'API не доступен, используем фоллбэк', apiError);
+
+      try {
+        return await this.fetchFallback(url);
+      } catch (fallbackError) {
+        Logger.warn('LinkPreview', 'Фоллбэк не сработал, возвращаем базовые данные');
+        Logger.groupEnd();
+        return this.createBasicMetadata(url);
+      }
+    }
+  },
+
+  async fetchFallback(url) {
+    Logger.log('LinkPreview', 'Фоллбэк: парсинг через proxy');
+
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+
+    const response = await fetch(proxyUrl, {
+      headers: { 'Accept': 'text/html' }
+    });
+
+    if (!response.ok) throw new Error(`Fallback HTTP ${response.status}`);
+
+    const html = await response.text();
+    return this.parseHtmlMetadata(html, url);
+  },
+
+  parseHtmlMetadata(html, baseUrl) {
+    Logger.log('LinkPreview', 'Парсинг HTML-метаданных');
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    const og = {
+      title: doc.querySelector('meta[property="og:title"]')?.content,
+      description: doc.querySelector('meta[property="og:description"]')?.content,
+      image: doc.querySelector('meta[property="og:image"]')?.content,
+      url: doc.querySelector('meta[property="og:url"]')?.content
+    };
+
+    const twitter = {
+      title: doc.querySelector('meta[name="twitter:title"]')?.content,
+      description: doc.querySelector('meta[name="twitter:description"]')?.content,
+      image: doc.querySelector('meta[name="twitter:image"]')?.content
+    };
+
+    const meta = {
+      title: doc.querySelector('title')?.textContent?.trim(),
+      description: doc.querySelector('meta[name="description"]')?.content
+    };
+
+    const result = {
+      title: og.title || twitter.title || meta.title || this.extractDomain(baseUrl),
+      description: og.description || twitter.description || meta.description || '',
+      image: og.image || twitter.image || null,
+      url: og.url || baseUrl,
+      domain: this.extractDomain(baseUrl),
+      favicon: this.extractFavicon(doc, baseUrl)
+    };
+
+    if (result.image) {
+      result.image = this.resolveImageUrl(result.image, baseUrl);
+    }
+
+    Logger.log('LinkPreview', 'Распарсенные метаданные', result);
+    return result;
+  },
+
+  normalizeMetadata(data, fallbackUrl) {
+    Logger.log('LinkPreview', 'Нормализация данных API');
+
+    return {
+      title: data.title || data.ogTitle || data.twitterTitle || this.extractDomain(fallbackUrl),
+      description: data.description || data.ogDescription || data.twitterDescription || '',
+      image: data.image || data.ogImage || data.twitterImage || null,
+      url: data.url || fallbackUrl,
+      domain: data.domain || this.extractDomain(fallbackUrl),
+      favicon: data.favicon || null
+    };
+  },
+
+  createBasicMetadata(url) {
+    Logger.log('LinkPreview', 'Создание базовых метаданных');
+
+    return {
+      title: this.extractDomain(url),
+      description: '',
+      image: null,
+      url: url,
+      domain: this.extractDomain(url),
+      favicon: `https://www.google.com/s2/favicons?domain=${this.extractDomain(url)}&sz=32`
+    };
+  },
+
+  extractDomain(url) {
+    try {
+      let testUrl = url;
+      if (!/^https?:\/\//i.test(testUrl)) testUrl = 'https://' + testUrl;
+      return new URL(testUrl).hostname.replace(/^www\./, '');
+    } catch {
+      return url;
+    }
+  },
+
+  extractFavicon(doc, baseUrl) {
+    const icons = [
+      doc.querySelector('link[rel="icon"]')?.href,
+      doc.querySelector('link[rel="shortcut icon"]')?.href,
+      doc.querySelector('link[rel="apple-touch-icon"]')?.href
+    ].filter(Boolean);
+
+    if (icons[0]) {
+      return this.resolveImageUrl(icons[0], baseUrl);
+    }
+
+    return `https://www.google.com/s2/favicons?domain=${this.extractDomain(baseUrl)}&sz=32`;
+  },
+
+  resolveImageUrl(imageUrl, baseUrl) {
+    if (!imageUrl) return null;
+    if (imageUrl.startsWith('http')) return imageUrl;
+    if (imageUrl.startsWith('//')) return 'https:' + imageUrl;
+
+    try {
+      return new URL(imageUrl, baseUrl).href;
+    } catch {
+      return imageUrl;
+    }
+  },
+
+  renderCard(metadata, editable = true) {
+    Logger.log('LinkPreview', 'Генерация HTML карточки', { editable, title: metadata.title });
+
+    const hasImage = metadata.image && metadata.image.trim() !== '';
+    const imageHtml = hasImage
+      ? `<div class="link-preview-image"><img src="${this.escapeHtml(metadata.image)}" alt="" onerror="this.parentElement.classList.add('placeholder'); this.parentElement.innerHTML='<i class=\\'bi bi-image\\'></i>';"></div>`
+      : `<div class="link-preview-image placeholder"><i class="bi bi-link-45deg"></i></div>`;
+
+    const editFormHtml = editable ? this.renderEditForm(metadata) : '';
+
+    return `
+      <div class="link-preview-card" id="linkPreviewCard">
+        ${imageHtml}
+        <div class="link-preview-content">
+          <div class="link-preview-title" id="previewTitle">${this.escapeHtml(metadata.title)}</div>
+          ${metadata.description ? `<div class="link-preview-description" id="previewDescription">${this.escapeHtml(metadata.description)}</div>` : ''}
+          <div class="link-preview-meta">
+            ${metadata.favicon ? `<img src="${this.escapeHtml(metadata.favicon)}" alt="">` : '<i class="bi bi-globe"></i>'}
+            <span class="link-preview-domain">${this.escapeHtml(metadata.domain)}</span>
+          </div>
+        </div>
+        ${editFormHtml}
+      </div>
+    `;
+  },
+
+  renderEditForm(metadata) {
+    const slug = this.generateSlug(metadata.title);
+
+    return `
+      <div class="edit-form" id="editForm">
+        <div class="mb-3">
+          <label class="edit-form-label" for="editTitle">
+            <i class="bi bi-pencil"></i> Заголовок
+          </label>
+          <input type="text" class="edit-form-input" id="editTitle"
+                 value="${this.escapeHtml(metadata.title)}"
+                 placeholder="Введите заголовок">
+        </div>
+        <div class="mb-0">
+          <label class="edit-form-label" for="editSlug">
+            <i class="bi bi-link-45deg"></i> Slug (URL)
+          </label>
+          <input type="text" class="edit-form-input" id="editSlug"
+                 value="${this.escapeHtml(slug)}"
+                 placeholder="url-friendly-name">
+          <div class="slug-hint">
+            Пример: <code>https://yoursite.com/link/<span id="slugPreview">${this.escapeHtml(slug)}</span></code>
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  generateSlug(text) {
+    if (!text) return 'link';
+
+    const cyrillic = "абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ";
+    const latin = "abvgdeejzijklmnoprstufhczchssh'yieyuABVGDEEJZIJKLMNOPRSTUFHCZCHSSH'YIEYU";
+
+    let slug = text.toLowerCase();
+    for (let i = 0; i < cyrillic.length; i++) {
+      slug = slug.replace(new RegExp(cyrillic[i], 'g'), latin[i]);
+    }
+
+    return slug
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .substring(0, 100) || 'link';
+  },
+
+  escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  },
+
+  bindLivePreview() {
+    const titleInput = document.getElementById('editTitle');
+    const slugInput = document.getElementById('editSlug');
+    const previewTitle = document.getElementById('previewTitle');
+    const slugPreview = document.getElementById('slugPreview');
+
+    if (titleInput && previewTitle) {
+      titleInput.addEventListener('input', (e) => {
+        previewTitle.textContent = e.target.value || 'Без заголовка';
+        if (slugInput && !slugInput.dataset.manuallyEdited) {
+          slugInput.value = this.generateSlug(e.target.value);
+          if (slugPreview) slugPreview.textContent = slugInput.value;
+        }
+      });
+    }
+
+    if (slugInput) {
+      slugInput.addEventListener('input', (e) => {
+        slugInput.dataset.manuallyEdited = 'true';
+        if (slugPreview) slugPreview.textContent = e.target.value;
+      });
+      slugInput.addEventListener('focus', () => {
+        slugInput.dataset.manuallyEdited = 'true';
+      });
+    }
+
+    Logger.log('LinkPreview', 'Live preview привязан');
+  }
+};
+
+/**
+ * ============================================================================
+ * 🔍 МОДУЛЬ АНАЛИЗА КОНТЕНТА
+ * ============================================================================
+ */
+const ContentAnalyzer = {
+  patterns: {
+    url: /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/i,
+    urlStrict: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)$/i,
+    telegram: /^@[\w_]{3,32}$/i,
+    telegramLink: /^https?:\/\/t\.me\/[\w_]{3,32}\/?$/i,
+    email: /^[\w.-]+@[\w.-]+\.\w{2,}$/i,
+    phone: /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{3,8}$/,
+    gps: /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/,
+    ip: /^(\d{1,3}\.){3}\d{1,3}$/,
+    hexColor: /^#?([a-f0-9]{6}|[a-f0-9]{3})$/i
+  },
+
+  countryCodes: {
+    '1': 'США/Канада', '7': 'Россия/Казахстан', '20': 'Египет', '27': 'ЮАР',
+    '30': 'Греция', '31': 'Нидерланды', '32': 'Бельгия', '33': 'Франция',
+    '34': 'Испания', '36': 'Венгрия', '39': 'Италия', '40': 'Румыния',
+    '41': 'Швейцария', '43': 'Австрия', '44': 'Великобритания', '45': 'Дания',
+    '46': 'Швеция', '47': 'Норвегия', '48': 'Польша', '49': 'Германия',
+    '51': 'Перу', '52': 'Мексика', '53': 'Куба', '54': 'Аргентина',
+    '55': 'Бразилия', '56': 'Чили', '57': 'Колумбия', '58': 'Венесуэла',
+    '60': 'Малайзия', '61': 'Австралия', '62': 'Индонезия', '63': 'Филиппины',
+    '64': 'Новая Зеландия', '65': 'Сингапур', '66': 'Таиланд', '81': 'Япония',
+    '82': 'Южная Корея', '84': 'Вьетнам', '86': 'Китай', '90': 'Турция',
+    '91': 'Индия', '92': 'Пакистан', '93': 'Афганистан', '94': 'Шри-Ланка',
+    '95': 'Мьянма', '98': 'Иран', '380': 'Украина', '375': 'Беларусь',
+    '995': 'Грузия', '994': 'Азербайджан', '996': 'Киргизия', '998': 'Узбекистан',
+    '992': 'Таджикистан', '993': 'Туркменистан'
+  },
+
+  analyze(input) {
+    Logger.group('ContentAnalyzer', 'Начало анализа');
+    Logger.log('ContentAnalyzer', 'Входные данные:', { input, length: input?.length });
+
+    if (!input || typeof input !== 'string') {
+      Logger.warn('ContentAnalyzer', 'Пустой или некорректный ввод');
+      Logger.groupEnd();
+      return { type: 'empty', value: null, confidence: 0 };
+    }
+
+    const text = input.trim();
+    if (!text) {
+      Logger.log('ContentAnalyzer', 'Пустая строка после trim()');
+      Logger.groupEnd();
+      return { type: 'empty', value: null, confidence: 0 };
+    }
+
+    const checks = [
+      { name: 'telegramLink', test: () => this.isTelegramLink(text), handler: () => this.handleTelegramLink(text) },
+      { name: 'url', test: () => this.isUrl(text), handler: () => this.handleUrl(text) },
+      { name: 'telegram', test: () => this.isTelegramNick(text), handler: () => this.handleTelegramNick(text) },
+      { name: 'email', test: () => this.isEmail(text), handler: () => this.handleEmail(text) },
+      { name: 'phone', test: () => this.isPhone(text), handler: () => this.handlePhone(text) },
+      { name: 'gps', test: () => this.isGps(text), handler: () => this.handleGps(text) },
+      { name: 'ip', test: () => this.isIp(text), handler: () => this.handleIp(text) },
+      { name: 'hexColor', test: () => this.isHexColor(text), handler: () => this.handleHexColor(text) }
+    ];
+
+    for (const check of checks) {
+      if (check.test()) {
+        const result = check.handler();
+        Logger.log('ContentAnalyzer', `Обнаружен тип: ${result.type}`, result);
+        Logger.groupEnd();
+        return result;
+      }
+    }
+
+    const result = this.handleText(text);
+    Logger.log('ContentAnalyzer', 'Тип по умолчанию: text', result);
+    Logger.groupEnd();
+    return result;
+  },
+
+  isUrl(str) {
+    Logger.log('ContentAnalyzer', `Проверка URL: "${str}"`);
+    try {
+      let testStr = str;
+      if (!/^https?:\/\//i.test(testStr)) testStr = 'https://' + testStr;
+      const url = new URL(testStr);
+      const isValid = url.hostname && url.hostname.includes('.');
+      Logger.log('ContentAnalyzer', `URL валидация: ${isValid}`, { hostname: url.hostname });
+      return isValid;
+    } catch(e) {
+      Logger.log('ContentAnalyzer', `URL валидация: false (ошибка парсинга)`);
+      return false;
+    }
+  },
+
+  isTelegramNick(str) { const r = this.patterns.telegram.test(str); Logger.log('ContentAnalyzer', `Telegram @: ${r}`); return r; },
+  isTelegramLink(str) { const r = this.patterns.telegramLink.test(str); Logger.log('ContentAnalyzer', `Telegram link: ${r}`); return r; },
+  isEmail(str) { const r = this.patterns.email.test(str); Logger.log('ContentAnalyzer', `Email: ${r}`); return r; },
+  isPhone(str) { const c = str.replace(/[\s\-\(\)\.]/g, ''); const r = this.patterns.phone.test(c); Logger.log('ContentAnalyzer', `Phone: ${r}`); return r; },
+  isGps(str) { const r = this.patterns.gps.test(str); Logger.log('ContentAnalyzer', `GPS: ${r}`); return r; },
+  isIp(str) { const r = this.patterns.ip.test(str); Logger.log('ContentAnalyzer', `IP: ${r}`); return r; },
+  isHexColor(str) { const r = this.patterns.hexColor.test(str); Logger.log('ContentAnalyzer', `Color: ${r}`); return r; },
+
+  handleUrl(str) {
+    let testStr = str;
+    if (!/^https?:\/\//i.test(testStr)) testStr = 'https://' + testStr;
+    try {
+      const url = new URL(testStr);
+      return {
+        type: 'url', value: str,
+        parsed: { protocol: url.protocol, hostname: url.hostname, pathname: url.pathname, domain: url.hostname.replace(/^www\./, '') },
+        confidence: 1,
+        icon: `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`
+      };
+    } catch(e) { return { type: 'url', value: str, confidence: 0.8 }; }
+  },
+
+  handleTelegramNick(str) { return { type: 'telegram', value: str, username: str.replace(/^@/, ''), link: `https://t.me/${str.replace(/^@/, '')}`, confidence: 1 }; },
+  handleTelegramLink(str) { const u = str.match(/t\.me\/([\w_]+)/i)?.[1] || ''; return { type: 'telegram', value: str, username: u, isLink: true, confidence: 1 }; },
+  handleEmail(str) { const [l,d] = str.split('@'); return { type: 'email', value: str, localPart: l, domain: d, confidence: 1 }; },
+  handlePhone(str) { const c = str.replace(/[^\d+]/g, ''); const country = this.detectCountryByPhone(c); return { type: 'phone', value: str, cleaned: c, country, confidence: country ? 0.95 : 0.7 }; },
+  handleGps(str) { const [lat, lng] = str.split(',').map(c => parseFloat(c.trim())); return { type: 'gps', value: str, coordinates: { lat, lng }, mapLink: `https://www.google.com/maps?q=${lat},${lng}`, confidence: 1 }; },
+  handleIp(str) { return { type: 'ip', value: str, confidence: 1 }; },
+  handleHexColor(str) { const hex = str.startsWith('#') ? str : '#' + str; return { type: 'color', value: str, hex: hex.toUpperCase(), confidence: 1 }; },
+  handleText(str) { return { type: 'text', value: str, length: str.length, words: str.split(/\s+/).filter(w => w).length, confidence: 1 }; },
+
+  detectCountryByPhone(phoneClean) {
+    Logger.log('ContentAnalyzer', 'Определение страны:', { phoneClean });
+    const sorted = Object.keys(this.countryCodes).sort((a,b) => b.length - a.length);
+    for (const code of sorted) {
+      if (phoneClean.startsWith(code)) {
+        Logger.log('ContentAnalyzer', `Код ${code} → ${this.countryCodes[code]}`);
+        return this.countryCodes[code];
+      }
+    }
+    return null;
+  },
+
+  renderResult(result) {
+    Logger.log('ContentAnalyzer', 'Генерация HTML результата', result);
+    const config = {
+      url: { icon: '🌐', label: 'URL-ссылка', class: 'url' },
+      telegram: { icon: '✈️', label: 'Telegram', class: 'telegram' },
+      email: { icon: '📧', label: 'Email', class: 'email' },
+      phone: { icon: '📱', label: 'Телефон', class: 'phone' },
+      gps: { icon: '📍', label: 'GPS', class: 'gps' },
+      ip: { icon: '🔢', label: 'IP', class: 'text' },
+      color: { icon: '🎨', label: 'Цвет', class: 'text' },
+      text: { icon: '📝', label: 'Текст', class: 'text' }
+    };
+    const c = config[result.type] || config.text;
+
+    let meta = '';
+    if (result.type === 'url' && result.parsed) meta = `<div class="analysis-meta">Домен: ${result.parsed.domain}</div>`;
+    else if (result.type === 'telegram') meta = `<div class="analysis-meta">@${result.username}</div>`;
+    else if (result.type === 'email') meta = `<div class="analysis-meta">${result.domain}</div>`;
+    else if (result.type === 'phone' && result.country) meta = `<div class="analysis-meta">${result.country}</div>`;
+    else if (result.type === 'text') meta = `<div class="analysis-meta">${result.length} симв.</div>`;
+
+    return `<div class="analysis-result"><div class="analysis-icon ${c.class}">${c.icon}</div><div class="analysis-content"><div class="analysis-label">${c.label}</div><div class="analysis-value">${ContentAnalyzer.escapeHtml(result.value)}</div>${meta}</div></div>`;
+  },
+
+  escapeHtml(str) { if (!str) return ''; const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+};
+
+/**
+ * ============================================================================
+ * 🧩 ОСНОВНОЙ КОНТРОЛЛЕР
+ * ============================================================================
+ */
+const App = {
+  elements: {},
+  state: {
+    selectedFile: null, friendlyFileName: '', isFileMode: false, currentFileTypeLabel: '',
+    lastAnalysisResult: null, linkMetadata: null, isSaving: false
+  },
+  config: { CHUNK_SIZE: 524288, AUTO_UPLOAD_DELAY: 1000, ANALYSIS_DEBOUNCE: 300 },
+  socket: null,
+
+  init() {
+    Logger.log('App', '=== Инициализация ===');
+    this.cacheElements();
+    this.bindEvents();
+    this.initState();
+    this.setupSocket();
+    this.showToast('Готово! Введите текст или ссылку', false);
+  },
+
+  cacheElements() {
+    Logger.group('App', 'Кэширование элементов');
+    this.elements = {
+      universalInput: document.getElementById('universalInput'),
+      siteIconZone: document.getElementById('siteIconZone'),
+      pasteBtn: document.getElementById('pasteBtn'),
+      cameraBtn: document.getElementById('cameraBtn'),
+      uploadAnyBtn: document.getElementById('uploadAnyBtn'),
+      fileInfoContainer: document.getElementById('fileInfoContainer'),
+      analysisPanel: document.getElementById('analysisPanel'),
+      analysisResults: document.getElementById('analysisResults'),
+      clearAnalysisBtn: document.getElementById('clearAnalysisBtn'),
+      linkPreviewContainer: document.getElementById('linkPreviewContainer'),
+      editFormContainer: document.getElementById('editFormContainer'),
+      actionButtons: document.getElementById('actionButtons'),
+      saveBtn: document.getElementById('saveBtn'),
+      saveBtnText: document.getElementById('saveBtnText'),
+      cancelEditBtn: document.getElementById('cancelEditBtn'),
+      progressContainer: document.getElementById('progressContainer'),
+      progressBar: document.getElementById('progressBar'),
+      percentText: document.getElementById('percentText'),
+      uploadStatus: document.getElementById('uploadStatus'),
+      resultPreview: document.getElementById('resultPreview'),
+      previewImg: document.getElementById('previewImg')
+    };
+    Logger.log('App', `Найдено элементов: ${Object.keys(this.elements).length}`);
+    Logger.groupEnd();
+  },
+
+  initState() {
+    Logger.log('App', 'Сброс состояния');
+    this.state = {
+      selectedFile: null, friendlyFileName: '', isFileMode: false, currentFileTypeLabel: '',
+      lastAnalysisResult: null, linkMetadata: null, isSaving: false
+    };
+  },
+
+  setupSocket() {
+    Logger.log('App', 'Настройка Socket.io');
+    try {
+      this.socket = io();
+      this.socket.on('MoreData', this.handleMoreData.bind(this));
+      this.socket.on('Done', this.handleUploadDone.bind(this));
+      this.socket.on('Error', this.handleUploadError.bind(this));
+      this.socket.on('ItemSaved', this.handleItemSaved.bind(this));
+      Logger.log('App', 'Socket.io подключен');
+    } catch(e) { Logger.error('App', 'Ошибка Socket.io', e); }
+  },
+
+  bindEvents() {
+    Logger.group('App', 'Привязка событий');
+
+    this.elements.universalInput.addEventListener('input',
+      this.debounce(this.handleInput.bind(this), this.config.ANALYSIS_DEBOUNCE)
+    );
+
+    this.elements.pasteBtn?.addEventListener('click', this.handlePaste.bind(this));
+    this.elements.cameraBtn?.addEventListener('click', this.handleCamera.bind(this));
+    this.elements.uploadAnyBtn?.addEventListener('click', this.handleFileSelect.bind(this));
+    this.elements.clearAnalysisBtn?.addEventListener('click', this.clearAnalysis.bind(this));
+    this.elements.saveBtn?.addEventListener('click', this.handleSave.bind(this));
+    this.elements.cancelEditBtn?.addEventListener('click', this.clearAnalysis.bind(this));
+
+    this.elements.siteIconZone?.addEventListener('click', (e) => {
+      if (e.target.id === 'clearSiteIconBtn') { e.stopPropagation(); this.clearSiteIcon(); }
+    });
+
+    Logger.log('App', 'События привязаны');
+    Logger.groupEnd();
+  },
+
+  handleInput() {
+    Logger.log('App', 'Событие input');
+    if (this.state.selectedFile) this.resetFileSelection();
+
+    const value = this.elements.universalInput.value.trim();
+    ContentAnalyzer.isUrl(value) ? this.updateSiteIcon(value) : this.clearSiteIcon();
+
+    if (value) {
+      this.analyzeAndDisplay(value);
+      if (ContentAnalyzer.isUrl(value)) {
+        this.fetchAndRenderLinkPreview(value);
+      }
+    } else {
+      this.hideAnalysisPanel();
+    }
+  },
+
+  async fetchAndRenderLinkPreview(url) {
+    Logger.log('App', 'Загрузка превью для:', url);
+
+    this.elements.linkPreviewContainer.innerHTML = `
+      <div class="preview-loading">
+        <div class="spinner"></div>
+        <span>Загружаем превью страницы...</span>
+      </div>
+    `;
+
+    try {
+      const metadata = await LinkPreview.fetchMetadata(url);
+      this.state.linkMetadata = metadata;
+
+      this.elements.linkPreviewContainer.innerHTML = LinkPreview.renderCard(metadata, true);
+
+      LinkPreview.bindLivePreview();
+
+      this.elements.actionButtons.classList.remove('d-none');
+
+      Logger.log('App', 'Превью успешно загружено', metadata);
+    } catch (error) {
+      Logger.error('App', 'Ошибка загрузки превью', error);
+      this.elements.linkPreviewContainer.innerHTML = `
+        <div class="alert alert-warning alert-sm mb-0">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          Не удалось загрузить превью. Ссылка будет сохранена как есть.
+        </div>
+      `;
+      this.elements.actionButtons.classList.remove('d-none');
+    }
+  },
+
+  analyzeAndDisplay(text) {
+    Logger.group('App', 'Анализ контента');
+    const result = ContentAnalyzer.analyze(text);
+    this.state.lastAnalysisResult = result;
+    this.elements.analysisResults.innerHTML = ContentAnalyzer.renderResult(result);
+    this.elements.analysisPanel.classList.remove('d-none');
+
+    if (result.type !== 'url') {
+      this.elements.linkPreviewContainer.innerHTML = '';
+      this.elements.editFormContainer.innerHTML = '';
+      this.elements.actionButtons.classList.add('d-none');
+    }
+
+    Logger.log('App', 'Панель анализа обновлена');
+    Logger.groupEnd();
+  },
+
+  hideAnalysisPanel() {
+    this.elements.analysisPanel.classList.add('d-none');
+    this.elements.analysisResults.innerHTML = '';
+    this.elements.linkPreviewContainer.innerHTML = '';
+    this.elements.editFormContainer.innerHTML = '';
+    this.elements.actionButtons.classList.add('d-none');
+    this.state.lastAnalysisResult = null;
+    this.state.linkMetadata = null;
+    Logger.log('App', 'Панель анализа скрыта');
+  },
+
+  clearAnalysis() {
+    Logger.log('App', 'Очистка анализа');
+    this.hideAnalysisPanel();
+    this.elements.universalInput.value = '';
+    this.clearSiteIcon();
+  },
+
+  updateSiteIcon(url) {
+    Logger.log('App', 'Обновление иконки сайта:', url);
+    try {
+      let urlToParse = url.trim();
+      if (!/^https?:\/\//i.test(urlToParse)) urlToParse = 'https://' + urlToParse;
+      const urlObj = new URL(urlToParse);
+      const hostname = urlObj.hostname;
+      if (!hostname) { this.clearSiteIcon(); return; }
+
+      const faviconUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+      const displayDomain = hostname.replace(/^www\./, '');
+
+      this.elements.siteIconZone.innerHTML = `
+        <div class="site-icon-preview" id="dynamicSitePreview">
+          <img src="${faviconUrl}" alt="favicon" referrerpolicy="no-referrer"
+               onerror="this.onerror=null; this.style.display='none'; this.parentElement.querySelector('.fallback-i')?.style.removeProperty('display');">
+          <i class="bi bi-globe2 fallback-i" style="display: none;"></i>
+          <span class="small">${displayDomain}</span>
+          <button type="button" class="btn-close btn-close-sm ms-1" id="clearSiteIconBtn" style="font-size: 0.5rem; width:0.8rem;"></button>
+        </div>
+      `;
+      Logger.log('App', 'Иконка сайта установлена');
+    } catch(e) { Logger.warn('App', 'Ошибка иконки сайта', e); this.clearSiteIcon(); }
+  },
+
+  clearSiteIcon() { this.elements.siteIconZone.innerHTML = ''; Logger.log('App', 'Иконка очищена'); },
+
+  async handleSave() {
+    Logger.group('App', 'Обработка сохранения');
+
+    if (this.state.isSaving) {
+      Logger.log('App', 'Уже сохраняется, игнорируем');
+      return;
+    }
+
+    const result = this.state.lastAnalysisResult;
+    if (!result) {
+      Logger.warn('App', 'Нет данных для сохранения');
+      this.showToast('Нечего сохранять', true);
+      Logger.groupEnd();
+      return;
+    }
+
+    const saveData = {
+      type: result.type,
+      originalValue: result.value,
+      title: null,
+      slug: null,
+      metadata: null,
+      timestamp: new Date().toISOString()
+    };
+
+    const editTitle = document.getElementById('editTitle');
+    const editSlug = document.getElementById('editSlug');
+
+    if (editTitle && editSlug) {
+      saveData.title = editTitle.value.trim() || result.value;
+      saveData.slug = editSlug.value.trim() || LinkPreview.generateSlug(saveData.title);
+      saveData.metadata = this.state.linkMetadata;
+    } else {
+      saveData.title = result.type === 'url' ? (this.state.linkMetadata?.title || result.value) : result.value;
+      saveData.slug = LinkPreview.generateSlug(saveData.title);
+    }
+
+    Logger.log('App', 'Данные для сохранения:', saveData);
+
+    this.state.isSaving = true;
+    this.elements.saveBtn.classList.add('saving');
+    this.elements.saveBtn.disabled = true;
+    this.elements.saveBtnText.textContent = 'Сохранение...';
+
+    try {
+      if (this.socket?.connected) {
+        Logger.log('App', 'Отправка события SaveItem на сервер');
+        this.socket.emit('SaveItem', saveData);
+
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Timeout')), 10000);
+          const handler = (response) => {
+            clearTimeout(timeout);
+            this.socket.off('ItemSaved', handler);
+            if (response.success) resolve(response);
+            else reject(new Error(response.error || 'Ошибка сервера'));
+          };
+          this.socket.once('ItemSaved', handler);
+        });
+
+        Logger.log('App', 'Сервер подтвердил сохранение');
+        this.showToast('✅ Сохранено!', false);
+
+        this.elements.saveBtn.classList.remove('saving');
+        this.elements.saveBtn.classList.add('saved');
+        this.elements.saveBtnText.textContent = '✓ Сохранено';
+
+        setTimeout(() => {
+          this.clearAnalysis();
+          this.elements.saveBtn.classList.remove('saved');
+          this.elements.saveBtnText.textContent = 'Сохранить';
+        }, 1500);
+
+      } else {
+        Logger.warn('App', 'Socket не подключен, сохраняем локально');
+        this.saveLocally(saveData);
+        this.showToast('✅ Сохранено локально', false);
+        setTimeout(() => this.clearAnalysis(), 1500);
+      }
+
+    } catch (error) {
+      Logger.error('App', 'Ошибка сохранения', error);
+      this.showToast(`❌ Ошибка: ${error.message}`, true);
+
+      this.elements.saveBtn.classList.remove('saving');
+      this.elements.saveBtn.disabled = false;
+      this.elements.saveBtnText.textContent = 'Сохранить';
+    }
+
+    this.state.isSaving = false;
+    Logger.groupEnd();
+  },
+
+  handleItemSaved(response) {
+    Logger.log('App', 'Получен ответ ItemSaved от сервера', response);
+    if (response.success) {
+      this.showToast('✅ Сохранено на сервере!', false);
+    } else {
+      this.showToast(`⚠️ ${response.error || 'Ошибка сервера'}`, true);
+    }
+  },
+
+  saveLocally(data) {
+    Logger.log('App', 'Локальное сохранение', data);
+    try {
+      const key = 'smartUploaderItems';
+      const items = JSON.parse(localStorage.getItem(key) || '[]');
+      items.unshift({ id: Date.now(), ...data });
+      localStorage.setItem(key, JSON.stringify(items.slice(0, 100)));
+      Logger.log('App', `Сохранено в localStorage, всего записей: ${items.length}`);
+    } catch(e) {
+      Logger.error('App', 'Ошибка localStorage', e);
+    }
+  },
+
+  handleFileSelected(file) {
+    Logger.group('App', 'Файл выбран');
+    Logger.log('App', 'Файл:', { name: file.name, size: file.size, type: file.type });
+    if (!file) { Logger.warn('App', 'Пустой файл'); Logger.groupEnd(); return; }
+
+    this.state.selectedFile = file;
+    this.state.friendlyFileName = this.transliterateFilename(file.name);
+    this.state.currentFileTypeLabel = this.detectFileType(file.name);
+    this.renderFileInfo(file);
+    this.hideAnalysisPanel();
+    this.elements.universalInput.value = `📁 ${file.name} (${(file.size/1024/1024).toFixed(2)} MB)`;
+    this.clearSiteIcon();
+
+    if (window.autoUploadTimer) clearTimeout(window.autoUploadTimer);
+    window.autoUploadTimer = setTimeout(() => {
+      if (this.state.selectedFile && this.state.isFileMode) {
+        Logger.log('App', 'Автозагрузка файла');
+        this.startUploadFile(this.state.selectedFile, this.state.friendlyFileName);
+      }
+    }, this.config.AUTO_UPLOAD_DELAY);
+    Logger.groupEnd();
+  },
+
+  renderFileInfo(file) {
+    const sizeMB = (file.size / (1024*1024)).toFixed(2);
+    const icons = { video:'🎬', image:'🖼️', audio:'🎵', document:'📄', archive:'🗜️', program:'⚙️', other:'📎' };
+    const icon = icons[this.state.currentFileTypeLabel] || '📁';
+
+    this.elements.fileInfoContainer.innerHTML = `
+      <div class="file-info-panel fade-in-up">
+        <div class="file-info-row"><span class="file-info-label">${icon} Тип:</span><span class="badge-type">${this.state.currentFileTypeLabel.toUpperCase()}</span></div>
+        <div class="file-info-row"><span class="file-info-label">📄 Оригинал:</span><span class="file-info-value">${ContentAnalyzer.escapeHtml(file.name)}</span></div>
+        <div class="file-info-row"><span class="file-info-label">✨ Друж.имя:</span><span class="file-info-value">${ContentAnalyzer.escapeHtml(this.state.friendlyFileName)}</span></div>
+        <div class="file-info-row"><span class="file-info-label">💾 Размер:</span><span class="file-info-value">${sizeMB} MB</span></div>
+        <div class="small text-muted mt-2"><i class="bi bi-cloud-upload"></i> Загрузка начнётся автоматически...</div>
+      </div>
+    `;
+    this.state.isFileMode = true;
+  },
+
+  handleCamera() { Logger.log('App', 'Открытие камеры'); this.openFilePicker({ accept:'image/*', capture:'environment', multiple:false }); },
+  handleFileSelect() { Logger.log('App', 'Выбор файла'); this.openFilePicker({ accept:'*/*', multiple:false }); },
+
+  openFilePicker(options = {}) {
+    Logger.log('App', 'File picker:', options);
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = options.accept || '*/*';
+    if (options.capture) input.setAttribute('capture', options.capture);
+    if (options.multiple) input.multiple = true;
+    input.style.display = 'none';
+
+    input.onchange = (e) => {
+      Logger.log('App', 'Файл выбран');
+      if (input.files?.[0]) this.handleFileSelected(input.files[0]);
+      document.body.removeChild(input);
+    };
+    input.onerror = (e) => { Logger.error('App', 'Ошибка file picker', e); this.showToast('Ошибка выбора файла', true); document.body.removeChild(input); };
+
+    document.body.appendChild(input);
+    input.click();
+  },
+
+  async handlePaste() {
+    Logger.log('App', 'Paste clicked');
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        Logger.log('App', 'Clipboard text:', text.substring(0,100) + (text.length>100?'...':''));
+        this.elements.universalInput.value = text;
+        this.elements.universalInput.dispatchEvent(new Event('input', { bubbles:true }));
+        this.showToast(`Вставлено: ${text.length>40?text.substr(0,40)+'…':text}`);
+        this.resetFileSelection();
+      } else { Logger.warn('App', 'Clipboard empty'); this.showToast('Буфер пуст', true); }
+    } catch(err) { Logger.error('App', 'Clipboard access denied', err); this.showToast('Нет доступа к буферу', true); }
+  },
+
+  startUploadFile(file, friendlyName) {
+    Logger.group('App', 'Начало загрузки');
+    Logger.log('App', 'Параметры:', { name: friendlyName, size: file.size });
+
+    this.elements.progressContainer.classList.remove('d-none');
+    this.elements.resultPreview.classList.add('d-none');
+    this.elements.progressBar.style.width = '0%';
+    this.elements.percentText.textContent = '0%';
+    this.elements.progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-primary';
+    this.elements.uploadStatus.textContent = `⏫ Отправка ${friendlyName}...`;
+
+    this.setButtonsEnabled(false);
+    this.socket?.emit('Start', { Name: friendlyName, Size: file.size });
+
+    window.currentUploadFile = file;
+    window.currentFriendly = friendlyName;
+    Logger.log('App', 'Start отправлен');
+    Logger.groupEnd();
+  },
+
+  handleMoreData({ Place, Percent }) {
+    Logger.log('App', 'MoreData:', { Place, Percent });
+    const file = window.currentUploadFile;
+    if (!file) { Logger.warn('App', 'No file'); return; }
+
+    const start = Place * this.config.CHUNK_SIZE;
+    if (start >= file.size) { Logger.log('App', 'EOF'); return; }
+
+    const end = Math.min(start + this.config.CHUNK_SIZE, file.size);
+    const chunk = file.slice(start, end);
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      const bytes = new Uint8Array(e.target.result);
+      let binary = '';
+      for (let i=0; i<bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      const base64 = btoa(binary);
+
+      this.socket?.emit('Upload', { Name: window.currentFriendly, Data: base64, IsBase64: true });
+
+      const percentDone = Math.min(100, Math.round((end/file.size)*100));
+      this.elements.progressBar.style.width = `${percentDone}%`;
+      this.elements.percentText.textContent = `${percentDone}%`;
+      Logger.log('App', `Chunk sent: ${start}-${end} (${percentDone}%)`);
+    };
+    reader.onerror = (e) => { Logger.error('App', 'Chunk read error', e); this.showToast('Ошибка чтения', true); };
+    reader.readAsArrayBuffer(chunk);
+  },
+
+  handleUploadDone({ Image, success, warning, DownloadUrl }) {
+    Logger.log('App', 'Upload done:', { success, warning, hasImage: !!Image, hasDownloadUrl: !!DownloadUrl });
+
+    this.elements.uploadStatus.innerHTML = success
+      ? '<i class="bi bi-check-circle-fill text-success"></i> Загружен!'
+      : `<i class="bi bi-exclamation-triangle text-warning"></i> ${warning||'Предупреждение'}`;
+
+    this.elements.progressBar.classList.remove('progress-bar-animated');
+    this.elements.progressBar.classList.add(success ? 'bg-success' : 'bg-warning');
+
+    if (success) {
+      this.renderUploadResult({
+        fileName: window.currentFriendly || this.state.friendlyFileName,
+        fileType: this.state.currentFileTypeLabel,
+        fileSize: this.state.selectedFile?.size || 0,
+        imageBase64: Image,
+        downloadUrl: DownloadUrl
+      });
+    }
+
+    setTimeout(() => {
+      this.elements.progressContainer.classList.add('d-none');
+    }, 1500);
+
+    this.resetFileSelection();
+    this.setButtonsEnabled(true);
+    window.currentUploadFile = null;
+  },
+
+  renderUploadResult({ fileName, fileType, fileSize, imageBase64, downloadUrl }) {
+    Logger.log('App', 'Рендер результата:', { fileName, fileType, fileSize });
+
+    const fileConfig = {
+      image: { icon: '🖼️', class: 'image', label: 'Изображение' },
+      video: { icon: '🎬', class: 'video', label: 'Видео' },
+      audio: { icon: '🎵', class: 'audio', label: 'Аудио' },
+      document: { icon: '📄', class: 'document', label: 'Документ' },
+      archive: { icon: '🗜️', class: 'other', label: 'Архив' },
+      other: { icon: '📎', class: 'other', label: 'Файл' }
+    };
+
+    const config = fileConfig[fileType] || fileConfig.other;
+    const sizeFormatted = fileSize
+      ? (fileSize < 1024*1024
+          ? `${(fileSize/1024).toFixed(1)} KB`
+          : `${(fileSize/1024/1024).toFixed(2)} MB`)
+      : '';
+
+    let fileUrl = '#';
+    let isDirectDownload = false;
+
+    if (downloadUrl) {
+      fileUrl = downloadUrl;
+      isDirectDownload = true;
+    } else if (imageBase64 && fileType === 'image') {
+      fileUrl = `data:image/jpeg;base64,${imageBase64}`;
+      isDirectDownload = true;
+    } else if (this.state.selectedFile) {
+      fileUrl = URL.createObjectURL(this.state.selectedFile);
+    }
+
+    let previewHtml = '';
+    if (fileType === 'image' && imageBase64) {
+      previewHtml = `
+        <div class="file-preview-container">
+          <img src="data:image/jpeg;base64,${imageBase64}" alt="${ContentAnalyzer.escapeHtml(fileName)}"
+               onerror="this.parentElement.innerHTML='<div class=\\'file-preview-placeholder\\'><i class=\\'bi bi-image\\'></i>Предпросмотр недоступен</div>'">
+        </div>
+      `;
+    } else if (fileType === 'video') {
+      const videoSrc = downloadUrl || (this.state.selectedFile ? URL.createObjectURL(this.state.selectedFile) : '');
+      previewHtml = videoSrc
+        ? `<div class="file-preview-container"><video src="${videoSrc}" controls preload="metadata"></video></div>`
+        : `<div class="file-preview-container"><div class="file-preview-placeholder"><i class="bi bi-film"></i>Видео загружено</div></div>`;
+    } else if (fileType === 'audio') {
+      const audioSrc = downloadUrl || (this.state.selectedFile ? URL.createObjectURL(this.state.selectedFile) : '');
+      previewHtml = audioSrc
+        ? `<div class="file-preview-container px-3"><audio src="${audioSrc}" controls class="w-100"></audio></div>`
+        : `<div class="file-preview-container"><div class="file-preview-placeholder"><i class="bi bi-music-note-beamed"></i>Аудио загружено</div></div>`;
+    } else {
+      previewHtml = `
+        <div class="file-preview-container">
+          <div class="file-preview-placeholder">
+            <i class="bi bi-file-earmark-text fs-4"></i>
+            <span>Файл готов к скачиванию</span>
+          </div>
+        </div>
+      `;
+    }
+
+    const resultHtml = `
+      <div class="upload-result-card">
+        <div class="upload-result-header">
+          <div class="file-type-icon ${config.class}">${config.icon}</div>
+          <div class="file-info-main">
+            <div class="file-name">${ContentAnalyzer.escapeHtml(fileName)}</div>
+            <div class="file-meta">
+              <span><i class="bi bi-tag"></i> ${config.label}</span>
+              ${sizeFormatted ? `<span><i class="bi bi-hdd"></i> ${sizeFormatted}</span>` : ''}
+              <span><i class="bi bi-check-circle text-success"></i> Готов</span>
+            </div>
+          </div>
+        </div>
+        ${previewHtml}
+        <div class="file-actions">
+          <button class="btn btn-reupload" onclick="App.clearAnalysis(); App.elements.universalInput.focus();">
+            <i class="bi bi-arrow-repeat"></i> Ещё
+          </button>
+          <a href="${fileUrl}" class="btn-download" ${!isDirectDownload && fileType !== 'image' ? 'download="'+ContentAnalyzer.escapeHtml(fileName)+'"' : ''} target="${isDirectDownload && fileType !== 'image' ? '_blank' : ''}">
+            <i class="bi bi-download"></i> Скачать
+          </a>
+        </div>
+      </div>
+    `;
+
+    this.elements.resultPreview.innerHTML = resultHtml;
+    this.elements.resultPreview.classList.remove('d-none');
+
+    Logger.log('App', 'Карточка результата отрисована');
+  },
+
+  handleUploadError({ message }) {
+    Logger.error('App', 'Upload error:', message);
+    this.elements.uploadStatus.innerHTML = `❌ Ошибка: ${message}`;
+    this.elements.progressBar.classList.add('bg-danger');
+    this.elements.progressBar.classList.remove('progress-bar-animated');
+    this.setButtonsEnabled(true);
+    setTimeout(() => this.elements.progressContainer.classList.add('d-none'), 2000);
+    this.resetFileSelection();
+    this.showToast('Ошибка загрузки: ' + message, true);
+  },
+
+  resetFileSelection() {
+    Logger.log('App', 'Reset file selection');
+
+    if (this.state.selectedFile && window._fileObjectUrl) {
+      URL.revokeObjectURL(window._fileObjectUrl);
+      delete window._fileObjectUrl;
+    }
+
+    this.state.selectedFile = null;
+    this.state.isFileMode = false;
+    this.state.friendlyFileName = '';
+    this.state.currentFileTypeLabel = '';
+    this.elements.fileInfoContainer.innerHTML = '';
+
+    if (window.autoUploadTimer) {
+      clearTimeout(window.autoUploadTimer);
+      delete window.autoUploadTimer;
+    }
+  },
+
+  setButtonsEnabled(enabled) {
+    [this.elements.pasteBtn, this.elements.cameraBtn, this.elements.uploadAnyBtn].forEach(btn => {
+      if (btn) enabled ? btn.removeAttribute('disabled') : btn.setAttribute('disabled', 'disabled');
+    });
+    Logger.log('App', `Buttons ${enabled?'enabled':'disabled'}`);
+  },
+
+  detectFileType(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const types = {
+      video: ['mp4','webm','mkv','avi','mov','m4v'], image: ['jpg','jpeg','png','gif','webp','bmp','svg'],
+      audio: ['mp3','wav','ogg','flac','m4a'], document: ['pdf','doc','docx','xls','xlsx','txt','md'],
+      archive: ['zip','rar','7z','tar','gz'], program: ['exe','msi','app','dmg']
+    };
+    for (const [type, exts] of Object.entries(types)) if (exts.includes(ext)) return type;
+    return 'other';
+  },
+
+  transliterateFilename(filename) {
+    const lastDot = filename.lastIndexOf('.');
+    const ext = lastDot !== -1 ? filename.slice(lastDot) : '';
+    let base = lastDot !== -1 ? filename.slice(0, lastDot) : filename;
+
+    const cyr = "абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ";
+    const lat = "abvgdeejzijklmnoprstufhczchssh'yieyuABVGDEEJZIJKLMNOPRSTUFHCZCHSSH'YIEYU";
+    for (let i=0; i<cyr.length; i++) base = base.split(cyr[i]).join(lat[i]);
+
+    return (base.toLowerCase().trim().replace(/[_\s]+/g,'-').replace(/[^a-z0-9-]+/g,'').replace(/-+/g,'-').replace(/^-+|-+$/g,'') || 'file') + ext;
+  },
+
+  debounce(func, wait) {
+    let timeout;
+    return (...args) => { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, wait), wait); };
+  },
+
+  showToast(msg, isError = false) {
+    let toast = document.getElementById('dynamicToastMsg');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'dynamicToastMsg';
+      toast.className = 'toast-msg';
+      document.body.appendChild(toast);
+    }
+    toast.style.backgroundColor = isError ? '#b91c1cdd' : '#1f2937ee';
+    toast.innerHTML = `<i class="bi ${isError?'bi-exclamation-triangle':'bi-info-circle'} me-1"></i> ${msg}`;
+    toast.style.opacity = '1'; toast.style.visibility = 'visible';
+    setTimeout(() => { toast.style.opacity='0'; setTimeout(()=>toast.style.visibility='hidden',300); }, 2200);
+    Logger.log('App', `Toast: ${msg}`);
+  }
+};
+
+// === ЗАПУСК ===
+document.addEventListener('DOMContentLoaded', () => {
+  Logger.log('Global', 'DOM loaded, starting app');
+  App.init();
+});
+
+window.addEventListener('error', (e) => {
+  Logger.error('Global', 'Uncaught error', { message: e.message, source: e.filename, lineno: e.lineno, colno: e.colno });
+});
+</script>
+</body>
+</html>

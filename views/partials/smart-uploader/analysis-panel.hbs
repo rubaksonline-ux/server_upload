@@ -1,0 +1,26 @@
+<!-- ПАНЕЛЬ АНАЛИЗА КОНТЕНТА -->
+<div id="analysisPanel" class="analysis-panel d-none">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h6 class="mb-0 fw-semibold"><i class="bi bi-search me-1"></i>Результат анализа</h6>
+    <button class="btn btn-sm btn-outline-secondary" id="clearAnalysisBtn" title="Очистить">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </div>
+  <div id="analysisResults"></div>
+
+  <!-- Контейнер для превью ссылки -->
+  <div id="linkPreviewContainer"></div>
+
+  <!-- Контейнер для формы редактирования -->
+  <div id="editFormContainer"></div>
+
+  <!-- Кнопки действий -->
+  <div id="actionButtons" class="save-actions d-none">
+    <button class="btn btn-cancel" id="cancelEditBtn">
+      <i class="bi bi-x-circle"></i> Отмена
+    </button>
+    <button class="btn btn-save" id="saveBtn">
+      <i class="bi bi-check-lg"></i> <span id="saveBtnText">Сохранить</span>
+    </button>
+  </div>
+</div>
